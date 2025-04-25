@@ -1,5 +1,5 @@
 # Diretórios de build
-/target/
+target/
 !.mvn/wrapper/maven-wrapper.jar
 
 # Arquivos de configuração específicos de IDEs
@@ -9,33 +9,13 @@
 .idea/
 .vscode/
 
-# Logs
-*.log
 
-# Sistema operacional
-.DS_Store
-Thumbs.db
 
-# Arquivos temporários
-*.tmp
-*.bak
-*.swp
-
-# Arquivos de ambiente / configs locais
-*.env
-*.properties.local
+#Env num geral
 application.properties
 
-# Backup de arquivos antigos
-*.old
-*.orig
 
-# Gerados pelo Maven
-dependency-reduced-pom.xml
-release.properties
 
-# Outras pastas não rastreáveis
-bin/
-build/
-out/
+
+
 
