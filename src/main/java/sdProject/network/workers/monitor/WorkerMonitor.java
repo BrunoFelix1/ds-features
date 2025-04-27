@@ -1,4 +1,4 @@
-package sdProject.network.monitor;
+package sdProject.network.workers.monitor;
 
 import java.io.IOException;
 import java.io.ObjectInputStream;

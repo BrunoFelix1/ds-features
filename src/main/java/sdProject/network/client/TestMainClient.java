@@ -9,7 +9,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-public class TestClient {
+public class TestMainClient {
     private static final String MATRICULA_SERVICE = "matricula";
     private static final String NOTA_SERVICE = "nota";
     private static final String HISTORICO_SERVICE = "historico";
@@ -19,16 +19,16 @@ public class TestClient {
     
     // Cache de localização dos serviços (serviço -> endereço:porta)
     private final Map<String, ServiceLocation> serviceCache = new ConcurrentHashMap<>();
-    public TestClient(String gatewayHost, int gatewayPort) {
-        this.gatewayHost = gatewayHost;
+    
+    public TestMainClient(String gatewayHost, int gatewayPort) {
+        this.gatewayHost = gatewayHost; // ISSO AQUI É O UNICO IP DA APLICAÇÃO BASICAMENTE
         this.gatewayPort = gatewayPort;
     }
     
     private ServiceLocation discoverService(String serviceName) throws IOException, ClassNotFoundException {
-        // Verifica se já temos o serviço em cache
         ServiceLocation cachedLocation = serviceCache.get(serviceName);
         if (cachedLocation != null) {
-            // Tenta verificar se o serviço ainda está disponível
+            // disponibilidae dele aqui
             try {
                 Socket testSocket = new Socket(cachedLocation.getHost(), cachedLocation.getPort());
                 testSocket.close();
@@ -140,6 +140,10 @@ public class TestClient {
         throw new IOException("Falha após " + maxRetries + " tentativas de chamar o serviço " + serviceName);
     }
 
+
+    // ESSAS FUNCOES AQUI SÃO EXEMPLOS DE COMO CHAMAR OS SERVIÇOS, A GENTE PODE MUDAR DEPOIS
+    // MAS O IMPORTANTE É QUE ELAS CHAMAM O GATEWAY E RETORNAM O RESULTADO
+    // E MOSTRAM AS CARACTERISISTICAS DE SD
     public Map<String, Object> matricularAluno(int alunoId, int disciplinaId) {
         Map<String, Object> request = new HashMap<>();
         request.put("action", "matricular");
@@ -208,7 +212,7 @@ public class TestClient {
             gatewayPort = Integer.parseInt(args[1]);
         }
         
-        TestClient client = new TestClient(gatewayHost, gatewayPort);
+        TestMainClient client = new TestMainClient(gatewayHost, gatewayPort);
         
         // Exemplo de uso do cliente abaixo, a gente modifica dps
         try {

@@ -15,7 +15,7 @@ public abstract class BaseWorker {
     protected final int port;
     protected final String workerName;
     protected final String serviceId;
-    protected final String serviceType; // Tipo do serviço (nota, matricula, historico)
+    protected final String serviceType; 
     protected volatile boolean running = false;
     protected ServerSocket serverSocket;
     protected final ExecutorService threadPool;

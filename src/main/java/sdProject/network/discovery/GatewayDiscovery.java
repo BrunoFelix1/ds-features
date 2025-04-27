@@ -54,7 +54,7 @@ public class GatewayDiscovery {
         
         serviceRegistry.forEach((serviceName, info) -> {
             // Considera um serviço inativo se não tiver enviado heartbeat nos últimos 30 segundos
-            if (currentTime - info.lastHeartbeat > 30000) {
+            if (currentTime - info.lastHeartbeat > 15000) {
                 System.out.println("Serviço inativo detectado: " + serviceName + " em " + info.address);
                 
                 // Tenta conectar para confirmar se realmente está inativo
