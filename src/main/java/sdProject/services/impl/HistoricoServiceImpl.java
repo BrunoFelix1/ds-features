@@ -7,8 +7,8 @@ import sdProject.dao.MatriculaDAO;
 import sdProject.models.Aluno;
 import sdProject.models.Disciplina;
 import sdProject.models.Matricula;
-import sdProject.services.HistoricoService;
-import sdProject.services.NotaService;
+import sdProject.services.interfaces.HistoricoService;
+import sdProject.services.interfaces.NotaService;
 
 import java.sql.Connection;
 import java.sql.SQLException;

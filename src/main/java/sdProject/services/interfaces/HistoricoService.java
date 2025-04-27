@@ -1,4 +1,4 @@
-package sdProject.services;
+package sdProject.services.interfaces;
 
 import sdProject.models.Disciplina;
 import java.sql.SQLException;

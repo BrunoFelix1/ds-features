@@ -2,9 +2,6 @@ package sdProject;
 
 import sdProject.config.DatabaseConnection;
 
-/**
- * Aplicação para executar as migrações do banco de dados
- */
 public class App {
     public static void main(String[] args) {
         System.out.println("Iniciando aplicação");
