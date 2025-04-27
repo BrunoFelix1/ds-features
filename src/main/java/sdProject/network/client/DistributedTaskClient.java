@@ -130,6 +130,8 @@ public class DistributedTaskClient {
 
      // Só rodar para testar o cliente
     public static void main(String[] args) {
+        // essa é a unica definicao de ip da aplicação basicamente, o resto
+        // é tudo dinâmico, a partir do gateway discovery
         String gatewayHost = "localhost";
         int gatewayPort = 8080;
         
