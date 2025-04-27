@@ -9,7 +9,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-public class DistributedTaskClient {
+public class TestClient {
     private static final String MATRICULA_SERVICE = "matricula";
     private static final String NOTA_SERVICE = "nota";
     private static final String HISTORICO_SERVICE = "historico";
@@ -19,7 +19,7 @@ public class DistributedTaskClient {
     
     // Cache de localização dos serviços (serviço -> endereço:porta)
     private final Map<String, ServiceLocation> serviceCache = new ConcurrentHashMap<>();
-    public DistributedTaskClient(String gatewayHost, int gatewayPort) {
+    public TestClient(String gatewayHost, int gatewayPort) {
         this.gatewayHost = gatewayHost;
         this.gatewayPort = gatewayPort;
     }
@@ -208,7 +208,7 @@ public class DistributedTaskClient {
             gatewayPort = Integer.parseInt(args[1]);
         }
         
-        DistributedTaskClient client = new DistributedTaskClient(gatewayHost, gatewayPort);
+        TestClient client = new TestClient(gatewayHost, gatewayPort);
         
         // Exemplo de uso do cliente abaixo, a gente modifica dps
         try {
