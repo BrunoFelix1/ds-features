@@ -8,14 +8,18 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 public abstract class BaseWorker {
     protected final int port;
     protected final String workerName;
     protected final String serviceId;
+    protected final String serviceType; // Tipo do serviço (nota, matricula, historico)
     protected volatile boolean running = false;
     protected ServerSocket serverSocket;
     protected final ExecutorService threadPool;
+    protected final ScheduledExecutorService heartbeatScheduler;
     
     private final String gatewayHost;
     private final int gatewayPort;
@@ -25,9 +29,17 @@ public abstract class BaseWorker {
         this.port = port;
         this.workerName = workerName;
         this.serviceId = serviceId;
+        this.serviceType = determineServiceType(serviceId);
         this.threadPool = Executors.newFixedThreadPool(threadPoolSize);
+        this.heartbeatScheduler = Executors.newScheduledThreadPool(1);
         this.gatewayHost = gatewayHost;
         this.gatewayPort = gatewayPort;
+    }
+    
+    private String determineServiceType(String serviceId) {
+        // Extrai o tipo de serviço (nota, matricula, historico) do ID
+        // Se o formato for diferente, ajuste conforme necessário
+        return serviceId;
     }
     
     public BaseWorker(int port, String workerName, String serviceId, int threadPoolSize) {
@@ -45,6 +57,9 @@ public abstract class BaseWorker {
             
             registerWithDiscoveryGateway();
             
+            // Inicia envio periódico de heartbeats (a cada 10 segundos)
+            heartbeatScheduler.scheduleAtFixedRate(this::sendHeartbeat, 10, 10, TimeUnit.SECONDS);
+            
         } catch (IOException e) {
             System.err.println("Erro ao iniciar " + workerName + ": " + e.getMessage());
             e.printStackTrace();
@@ -60,6 +75,7 @@ public abstract class BaseWorker {
             request.put("operation", "register");
             request.put("serviceName", serviceId);
             request.put("serviceAddress", serviceAddress);
+            request.put("serviceType", serviceType);
             
             try (Socket socket = new Socket(gatewayHost, gatewayPort);
                  ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
@@ -78,6 +94,31 @@ public abstract class BaseWorker {
         } catch (Exception e) {
             System.err.println("Erro ao registrar no Gateway Discovery: " + e.getMessage());
             e.printStackTrace();
+        }
+    }
+    
+    protected void sendHeartbeat() {
+        try {
+            Map<String, Object> request = new HashMap<>();
+            request.put("operation", "heartbeat");
+            request.put("serviceName", serviceId);
+            
+            try (Socket socket = new Socket(gatewayHost, gatewayPort);
+                 ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
+                 ObjectInputStream in = new ObjectInputStream(socket.getInputStream())) {
+                
+                out.writeObject(request);
+                Map<String, Object> response = (Map<String, Object>) in.readObject();
+                
+                if (!"success".equals(response.get("status"))) {
+                    System.out.println("Falha no heartbeat para " + serviceId + ": " + response.get("message"));
+                    // Tenta se registrar novamente
+                    registerWithDiscoveryGateway();
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("Erro ao enviar heartbeat para Gateway Discovery: " + e.getMessage());
+            // Não empilha o erro para evitar logs excessivos
         }
     }
     
@@ -132,6 +173,7 @@ public abstract class BaseWorker {
     public void stop() {
         running = false;
         threadPool.shutdown();
+        heartbeatScheduler.shutdown();
         
         try {
             if (serverSocket != null && !serverSocket.isClosed()) {

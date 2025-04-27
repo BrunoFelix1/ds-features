@@ -4,8 +4,10 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.net.Socket;
+import java.net.ConnectException;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class DistributedTaskClient {
     private static final String MATRICULA_SERVICE = "matricula";
@@ -16,8 +18,7 @@ public class DistributedTaskClient {
     private final int gatewayPort;
     
     // Cache de localização dos serviços (serviço -> endereço:porta)
-    private final Map<String, ServiceLocation> serviceCache = new HashMap<>();
-    
+    private final Map<String, ServiceLocation> serviceCache = new ConcurrentHashMap<>();
     public DistributedTaskClient(String gatewayHost, int gatewayPort) {
         this.gatewayHost = gatewayHost;
         this.gatewayPort = gatewayPort;
@@ -25,8 +26,18 @@ public class DistributedTaskClient {
     
     private ServiceLocation discoverService(String serviceName) throws IOException, ClassNotFoundException {
         // Verifica se já temos o serviço em cache
-        if (serviceCache.containsKey(serviceName)) {
-            return serviceCache.get(serviceName);
+        ServiceLocation cachedLocation = serviceCache.get(serviceName);
+        if (cachedLocation != null) {
+            // Tenta verificar se o serviço ainda está disponível
+            try {
+                Socket testSocket = new Socket(cachedLocation.getHost(), cachedLocation.getPort());
+                testSocket.close();
+                return cachedLocation;  // Serviço ainda está ativo
+            } catch (ConnectException e) {
+                // Serviço não está disponível, entao a gnt remove ele
+                serviceCache.remove(serviceName);
+                System.out.println("Serviço " + serviceName + " não está mais disponível.");
+            }
         }
         
         Map<String, Object> request = new HashMap<>();
@@ -50,27 +61,83 @@ public class DistributedTaskClient {
                 System.out.println("Serviço " + serviceName + " descoberto em " + serviceAddress);
                 return location;
             } else {
-                throw new IOException("Erro ao descobrir serviço: " + response.get("message"));
+                return findAlternativeService(serviceName);
             }
+        }
+    }
+    
+    private ServiceLocation findAlternativeService(String serviceType) throws IOException, ClassNotFoundException {
+        System.out.println("Procurando serviços alternativos para " + serviceType);
+        
+        Map<String, Object> request = new HashMap<>();
+        request.put("operation", "getServices");
+        request.put("serviceType", serviceType);
+        
+        try (Socket socket = new Socket(gatewayHost, gatewayPort);
+             ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
+             ObjectInputStream in = new ObjectInputStream(socket.getInputStream())) {
+            
+            out.writeObject(request);
+            
+            Map<String, Object> response = (Map<String, Object>) in.readObject();
+            
+            if ("success".equals(response.get("status"))) {
+                Map<String, String> services = (Map<String, String>) response.get("services");
+                
+                if (services != null && !services.isEmpty()) {
+                    Map.Entry<String, String> entry = services.entrySet().iterator().next();
+                    String serviceName = entry.getKey();
+                    String serviceAddress = entry.getValue();
+                    
+                    ServiceLocation location = new ServiceLocation(serviceAddress);
+                    serviceCache.put(serviceName, location);
+                    
+                    System.out.println("Usando serviço alternativo " + serviceName + " em " + serviceAddress);
+                    return location;
+                }
+            }
+            
+            throw new IOException("Nenhum serviço do tipo " + serviceType + " disponível");
         }
     }
     
     public Map<String, Object> callService(String serviceName, Map<String, Object> request) 
             throws IOException, ClassNotFoundException {
         
-        ServiceLocation location = discoverService(serviceName);
+        int maxRetries = 3;
+        int retryCount = 0;
         
-        try (Socket socket = new Socket(location.getHost(), location.getPort());
-             ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
-             ObjectInputStream in = new ObjectInputStream(socket.getInputStream())) {
-            
-            out.writeObject(request);
-            
-            return (Map<String, Object>) in.readObject();
-        } catch (IOException e) {
-            serviceCache.remove(serviceName);
-            throw e;
+        while (retryCount < maxRetries) {
+            try {
+                ServiceLocation location = discoverService(serviceName);
+                
+                try (Socket socket = new Socket(location.getHost(), location.getPort());
+                     ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
+                     ObjectInputStream in = new ObjectInputStream(socket.getInputStream())) {
+                    
+                    out.writeObject(request);
+                    
+                    return (Map<String, Object>) in.readObject();
+                } catch (ConnectException e) {
+                    serviceCache.remove(serviceName);
+                    System.out.println("Falha na conexão com " + serviceName + ". Tentando novamente...");
+                    retryCount++;
+                }
+            } catch (IOException | ClassNotFoundException e) {
+                System.err.println("Erro ao chamar serviço " + serviceName + ": " + e.getMessage());
+                retryCount++;
+                if (retryCount >= maxRetries) {
+                    throw e;
+                }
+                try {
+                    Thread.sleep(1000);
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                }
+            }
         }
+        
+        throw new IOException("Falha após " + maxRetries + " tentativas de chamar o serviço " + serviceName);
     }
 
     public Map<String, Object> matricularAluno(int alunoId, int disciplinaId) {
