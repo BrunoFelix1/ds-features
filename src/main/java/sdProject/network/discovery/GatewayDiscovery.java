@@ -1,11 +1,12 @@
 package sdProject.network.discovery;
 
+import sdProject.network.util.SerializationUtils;
+
+import javax.xml.crypto.Data;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
-import java.net.ServerSocket;
-import java.net.Socket;
-import java.net.ConnectException;
+import java.net.*;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -20,9 +21,13 @@ public class GatewayDiscovery {
     private final Map<String, ServiceInfo> serviceRegistry = new ConcurrentHashMap<>();
     
     private volatile boolean running = false;
-    private ServerSocket serverSocket;
+    private DatagramSocket datagramSocket;
+    /*private ServerSocket serverSocket;*/
+
     private final ExecutorService threadPool;
     private final ScheduledExecutorService healthChecker;
+
+    private static final int MAX_PACKET_SIZE = 65507; /*Tamanho máximo do payload UDP*/
     
 
     public GatewayDiscovery(int port, int threadPoolSize) {
@@ -33,11 +38,12 @@ public class GatewayDiscovery {
     
     public void start() {
         try {
-            serverSocket = new ServerSocket(port);
+            datagramSocket = new DatagramSocket(port);
             running = true;
-            System.out.println("Gateway Discovery iniciado na porta " + port);
-            
-            new Thread(() -> acceptConnections()).start();
+            System.out.println("Gateway Discovery (UDP) inciado na porta " + port);
+
+            // Inicia a thread para receber pacotes UDP
+            new Thread(this::receivePackets).start();
             
             // Inicia verificação periódica da saúde dos serviços
             healthChecker.scheduleAtFixedRate(this::checkServiceHealth, 10, 10, TimeUnit.SECONDS);
@@ -61,6 +67,11 @@ public class GatewayDiscovery {
                 if (!isServiceAlive(info.address)) {
                     System.out.println("Confirmado: Serviço " + serviceName + " está inativo. Removendo do registro.");
                     serviceRegistry.remove(serviceName);
+                } else {
+                    if (currentTime - info.lastHeartbeat > 60000){
+                        System.out.println("Removendo " + serviceName + " devido a heartbeats UDP ausentes prolongados, apesar de TCP check OK.");
+                        serviceRegistry.remove(serviceName);
+                    }
                 }
             }
         });
@@ -83,27 +94,30 @@ public class GatewayDiscovery {
         }
     }
     
-    private void acceptConnections() {
+    private void receivePackets() {
+        byte[] buffer = new byte[MAX_PACKET_SIZE];
         while (running) {
             try {
-                Socket clientSocket = serverSocket.accept();
-                System.out.println("Nova conexão aceita de: " + clientSocket.getInetAddress().getHostAddress());
-                
-                threadPool.submit(() -> handleClient(clientSocket));
+                DatagramPacket incomingPacket = new DatagramPacket(buffer, buffer.length);
+                datagramSocket.receive(incomingPacket); /*Bloqueia até receber um packet*/
+
+                byte[] receiveData = new byte[incomingPacket.getLength()];
+                System.arraycopy(incomingPacket.getData(), incomingPacket.getOffset(), receiveData, 0, incomingPacket.getLength());
+
+                threadPool.submit(() -> handlePacket(receiveData, incomingPacket.getAddress(), incomingPacket.getPort()));
                 
             } catch (IOException e) {
                 if (running) { 
-                    System.err.println("Erro ao aceitar conexão: " + e.getMessage());
+                    System.err.println("Erro ao receber pacote UDP: " + e.getMessage());
                 }
             }
         }
     }
     
-    private void handleClient(Socket clientSocket) {
-        try (ObjectInputStream in = new ObjectInputStream(clientSocket.getInputStream());
-             ObjectOutputStream out = new ObjectOutputStream(clientSocket.getOutputStream())) {
+    private void handlePacket(byte[] data, InetAddress clientAddress, int clientPort) {
+        try {
             
-            Map<String, Object> request = (Map<String, Object>) in.readObject();
+            Map<String, Object> request = (Map<String, Object>) SerializationUtils.deserialize(data);
             String operation = (String) request.get("operation");
             
             Map<String, Object> response = new HashMap<>();
@@ -126,16 +140,22 @@ public class GatewayDiscovery {
                     response.put("message", "Operação desconhecida: " + operation);
             }
             
-            out.writeObject(response);
+            byte[] responseBytes = SerializationUtils.serialize(response);
+            DatagramPacket responsePacket = new DatagramPacket(responseBytes, responseBytes.length, clientAddress, clientPort);
+            datagramSocket.send(responsePacket);
             
         } catch (IOException | ClassNotFoundException e) {
-            System.err.println("Erro ao processar cliente: " + e.getMessage());
+            System.err.println("Erro ao processar pacote UDP: " + e.getMessage());
             e.printStackTrace();
-        } finally {
             try {
-                clientSocket.close();
-            } catch (IOException e) {
-                System.err.println("Erro ao fechar socket: " + e.getMessage());
+                Map<String, Object> errorResponse = new HashMap<>();
+                errorResponse.put("status", "error");
+                errorResponse.put("message", "Erro interno no gateway: " + e.getMessage());
+                byte[] errorBytes = SerializationUtils.serialize(errorResponse);
+                DatagramPacket errorPacket = new DatagramPacket(errorBytes, errorBytes.length, clientAddress, clientPort);
+                datagramSocket.send(errorPacket);
+            } catch (IOException ex){
+                System.err.println("Erro ao enviar resposta de erro UDP: " + ex.getMessage());
             }
         }
     }
@@ -242,17 +262,13 @@ public class GatewayDiscovery {
 
     public void stop() {
         running = false;
+        if (datagramSocket != null && !datagramSocket.isClosed()){
+            datagramSocket.close();
+        }
+
         threadPool.shutdown();
         healthChecker.shutdown();
-        
-        try {
-            if (serverSocket != null && !serverSocket.isClosed()) {
-                serverSocket.close();
-            }
-            System.out.println("Gateway Discovery parado");
-        } catch (IOException e) {
-            System.err.println("Erro ao parar Gateway Discovery: " + e.getMessage());
-        }
+        System.out.println("Gateway Discovery (UDP) parado");
     }
     
     public static void main(String[] args) {
