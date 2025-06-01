@@ -1,9 +1,9 @@
 package sdProject.network.workers;
 
+import sdProject.network.util.SerializationUtils;
+
 import java.io.*;
-import java.net.ServerSocket;
-import java.net.Socket;
-import java.net.InetAddress;
+import java.net.*;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
@@ -23,6 +23,9 @@ public abstract class BaseWorker {
     
     private final String gatewayHost;
     private final int gatewayPort;
+
+    private static final int UDP_TIMEOUT_MS = 5000; // Tempo para respostas do gateway
+    private static final int MAX_PACKET_SIZE = 65507;
     
     public BaseWorker(int port, String workerName, String serviceId, int threadPoolSize, 
                      String gatewayHost, int gatewayPort) {
@@ -55,70 +58,82 @@ public abstract class BaseWorker {
             
             new Thread(() -> acceptConnections()).start();
             
-            registerWithDiscoveryGateway();
+            registerWithDiscoveryGatewayUDP();
             
             // Inicia envio periódico de heartbeats (a cada 10 segundos)
-            heartbeatScheduler.scheduleAtFixedRate(this::sendHeartbeat, 10, 10, TimeUnit.SECONDS);
+            heartbeatScheduler.scheduleAtFixedRate(this::sendHeartbeatUDP, 10, 10, TimeUnit.SECONDS);
             
         } catch (IOException e) {
             System.err.println("Erro ao iniciar " + workerName + ": " + e.getMessage());
             e.printStackTrace();
         }
     }
+
+    private Map<String, Object> sendAndReceiveUDP(Map<String, Object> requestPayload) throws IOException, ClassNotFoundException {
+        try (DatagramSocket udpSocket = new DatagramSocket()){
+            udpSocket.setSoTimeout(UDP_TIMEOUT_MS);
+            InetAddress gatewayAddress = InetAddress.getByName(gatewayHost);
+
+            byte[] sendData = SerializationUtils.serialize(requestPayload);
+            DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length, gatewayAddress, gatewayPort);
+            udpSocket.send(sendPacket);
+
+            byte[] receiveBuffer = new byte[MAX_PACKET_SIZE];
+            DatagramPacket receivePacket = new DatagramPacket(receiveBuffer, receiveBuffer.length);
+            udpSocket.receive(receivePacket);
+
+            byte[] actualData = new byte[receivePacket.getLength()];
+            System.arraycopy(receivePacket.getData(), receivePacket.getOffset(), actualData, 0, receivePacket.getLength());
+
+            return (Map<String, Object>) SerializationUtils.deserialize(actualData);
+        }
+    }
     
-    protected void registerWithDiscoveryGateway() {
+    protected void registerWithDiscoveryGatewayUDP() {
         try {
             String localIP = InetAddress.getLocalHost().getHostAddress();
-            String serviceAddress = localIP + ":" + port;
-            
+            String serviceAddress = localIP + ":" + this.port;
+
             Map<String, Object> request = new HashMap<>();
             request.put("operation", "register");
             request.put("serviceName", serviceId);
             request.put("serviceAddress", serviceAddress);
             request.put("serviceType", serviceType);
-            
-            try (Socket socket = new Socket(gatewayHost, gatewayPort);
-                 ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
-                 ObjectInputStream in = new ObjectInputStream(socket.getInputStream())) {
-                
-                out.writeObject(request);
-                
-                Map<String, Object> response = (Map<String, Object>) in.readObject();
-                
-                if ("success".equals(response.get("status"))) {
-                    System.out.println(workerName + " registrado no Gateway Discovery como " + serviceId);
-                } else {
-                    System.out.println("Falha ao registrar no Gateway: " + response.get("message"));
-                }
+
+            Map<String, Object> response = sendAndReceiveUDP(request);
+
+            if ("success".equals(response.get("status"))) {
+                System.out.println(workerName + " registrado no Gateway Discovery (UDP) como " + serviceId);
+            } else {
+                System.out.println("Falha ao registrar no Gateway (UDP): " + response.get("message"));
             }
+        } catch (SocketTimeoutException e) {
+            System.err.println("Timeout ao registrar no Gateway Discovery (UDP): " + e.getMessage());
         } catch (Exception e) {
-            System.err.println("Erro ao registrar no Gateway Discovery: " + e.getMessage());
-            e.printStackTrace();
+            System.err.println("Erro ao registrar no Gateway Discoveryu (UDP): " + e.getMessage());
         }
     }
     
-    protected void sendHeartbeat() {
+    protected void sendHeartbeatUDP() {
         try {
             Map<String, Object> request = new HashMap<>();
             request.put("operation", "heartbeat");
             request.put("serviceName", serviceId);
-            
-            try (Socket socket = new Socket(gatewayHost, gatewayPort);
-                 ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
-                 ObjectInputStream in = new ObjectInputStream(socket.getInputStream())) {
-                
-                out.writeObject(request);
-                Map<String, Object> response = (Map<String, Object>) in.readObject();
-                
-                if (!"success".equals(response.get("status"))) {
-                    System.out.println("Falha no heartbeat para " + serviceId + ": " + response.get("message"));
-                    // Tenta se registrar novamente
-                    registerWithDiscoveryGateway();
+
+            Map<String, Object> response = sendAndReceiveUDP(request);
+
+            if (!"success".equals(response.get("status"))) {
+                System.out.println("Falha no heartbeat UDP para " + serviceId + ": " + response.get("message"));
+                if ("Serviço não encontrado".equals(response.get("message"))) {
+                    registerWithDiscoveryGatewayUDP();
                 }
+            } else {
+                System.out.println("Heartbeat UDP para " + serviceId + " enviado com sucesso.");
             }
+        } catch (SocketTimeoutException e) {
+            System.err.println("Timeout no heartbeat para Gateway Discovery (UDP): " + e.getMessage());
         } catch (Exception e) {
-            System.err.println("Erro ao enviar heartbeat para Gateway Discovery: " + e.getMessage());
-            // Não empilha o erro para evitar logs excessivos
+            System.err.println("Erro ao enviar heartbeat para Gateway Discovery (UDP): " + e.getMessage());
         }
     }
     
