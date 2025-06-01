@@ -1,10 +1,12 @@
 package sdProject.network.workers.monitor;
 
+import sdProject.network.util.SerializationUtils;
+
+import javax.xml.crypto.Data;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
-import java.net.ServerSocket;
-import java.net.Socket;
+import java.net.*;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ScheduledExecutorService;
@@ -20,6 +22,9 @@ public class WorkerMonitor {
     private final ScheduledExecutorService scheduler;
     private final Map<String, WorkerInfo> workerConfigs;
     private final Map<String, Process> activeProcesses;
+
+    private static final int UDP_TIMEOUT_MS = 5000;
+    private static final int MAX_PACKET_SIZE = 65507;
     
 
     
@@ -44,13 +49,54 @@ public class WorkerMonitor {
         
         System.out.println("WorkerMonitor iniciado. Monitorando workers...");
     }
+
+    private Map<String, String> getAvailableServicesUDP(String serviceType){
+        Map<String, String> result = new HashMap<>();
+        Map<String, Object> request = new HashMap<>();
+
+        request.put("operation", "getServices");
+        request.put("serviceType", serviceType);
+
+        try (DatagramSocket udpSocket = new DatagramSocket()){
+            udpSocket.setSoTimeout(UDP_TIMEOUT_MS);
+            InetAddress gwAddress = InetAddress.getByName(gatewayHost);
+
+            byte[] sendData = SerializationUtils.serialize(request);
+            DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length, gwAddress, gatewayPort);
+            udpSocket.send(sendPacket);
+
+            byte[] receiveBuffer = new byte[MAX_PACKET_SIZE];
+            DatagramPacket receivePacket = new DatagramPacket(receiveBuffer, receiveBuffer.length);
+            udpSocket.receive(receivePacket);
+
+            byte[] actualData = new byte[receivePacket.getLength()];
+            System.arraycopy(receivePacket.getData(), receivePacket.getOffset(), actualData, 0, receivePacket.getLength());
+
+            Map<String, Object> response = (Map<String, Object>) SerializationUtils.deserialize(actualData);
+
+            if ("success".equals(response.get("status"))){
+                Map<String, String> services = (Map<String, String>) response.get("services");
+                if (services != null){
+                    return services;
+                }
+            } else {
+                System.err.println("Gateway falhou ao obter serviços para " + serviceType + ": " + response.get("message"));
+            }
+        } catch (SocketTimeoutException e){
+            System.err.println("Timeout ao obter serviços do tipo " + serviceType);
+        } catch (IOException | ClassNotFoundException e){
+            System.err.println("Erro ao obter serviços do tipo " + serviceType + " " + e.getMessage());
+        }
+
+        return result; // Em caso de erro ou timeout, retorna vazio.
+    }
     
     private void checkWorkersHealth() {
         System.out.println("Verificando saúde dos workers...");
         
         try {
             for (String serviceType : workerConfigs.keySet()) {
-                Map<String, String> availableServices = getAvailableServices(serviceType);
+                Map<String, String> availableServices = getAvailableServicesUDP(serviceType);
                 
                 if (availableServices.isEmpty()) {
                     boolean hasActiveWorker = false;
@@ -78,36 +124,6 @@ public class WorkerMonitor {
         }
     }
     
-    private Map<String, String> getAvailableServices(String serviceType) {
-        Map<String, String> result = new HashMap<>();
-        
-        try {
-            Map<String, Object> request = new HashMap<>();
-            request.put("operation", "getServices");
-            request.put("serviceType", serviceType);
-            
-            try (Socket socket = new Socket(gatewayHost, gatewayPort);
-                 ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
-                 ObjectInputStream in = new ObjectInputStream(socket.getInputStream())) {
-                
-                out.writeObject(request);
-                
-                Map<String, Object> response = (Map<String, Object>) in.readObject();
-                
-                if ("success".equals(response.get("status"))) {
-                    Map<String, String> services = (Map<String, String>) response.get("services");
-                    if (services != null) {
-                        return services;
-                    }
-                }
-            }
-        } catch (Exception e) {
-            System.err.println("Erro ao obter serviços do tipo " + serviceType + ": " + e.getMessage());
-        }
-        
-        return result;
-    }
-    
     private void startNewWorker(String serviceType) {
         WorkerInfo info = workerConfigs.get(serviceType);
         if (info == null) {
@@ -121,7 +137,7 @@ public class WorkerMonitor {
             
             // Verifica se já existe um worker deste tipo rodando
             String processKey = serviceType + "-" + port;
-            if (activeProcesses.containsKey(processKey)) {
+            if (activeProcesses.containsKey(processKey) && activeProcesses.get(processKey).isAlive()) {
                 System.out.println("Worker " + serviceType + " já está rodando na porta " + port);
                 return;
             }
@@ -151,6 +167,8 @@ public class WorkerMonitor {
                     activeProcesses.remove(processKey);
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
+                    System.err.println("Thread de monitoramento do worker " + serviceType + " interrompida.");
+                    activeProcesses.remove(processKey);
                 }
             }).start();
             
@@ -163,23 +181,35 @@ public class WorkerMonitor {
         int port = startingPort;
         
         // Verifica se a porta já está sendo usada por algum processo ativo
-        for (String processKey : activeProcesses.keySet()) {
-            if (processKey.endsWith("-" + port)) {
-                // Porta já em uso, incrementa
+        synchronized (activeProcesses){
+            boolean portInUseByActiveProcess;
+            do{
+                portInUseByActiveProcess = false;
+                for (String processKey : activeProcesses.keySet()) {
+                    if (processKey.endsWith("-" + port) && activeProcesses.get(processKey).isAlive()) {
+                        // Porta já em uso, incrementa
+                        port++;
+                        portInUseByActiveProcess = true;
+                        break;
+                    }
+                }
+            } while (portInUseByActiveProcess);
+        }
+
+
+        // Procura por uma porta disponível e retorna a primeira que encontrar.
+        while (true){
+            if (isPortAvailable(port)){
+                return port;
+            } else {
                 port++;
             }
         }
-        
-        // Verifica se a porta está realmente disponível tentando abrir um socket
-        while (!isPortAvailable(port)) {
-            port++;
-        }
-        
-        return port;
     }
     
     private boolean isPortAvailable(int port) {
         try (ServerSocket socket = new ServerSocket(port)) {
+            socket.setReuseAddress(true);
             // Se conseguir abrir um socket, a porta está disponível
             return true;
         } catch (IOException e) {
@@ -190,17 +220,26 @@ public class WorkerMonitor {
     
     public void stop() {
         scheduler.shutdown();
-        
-        // Para todos os processos ativos
-        for (Process process : activeProcesses.values()) {
-            try {
-                process.destroy();
-            } catch (Exception e) {
-                System.err.println("Erro ao parar processo: " + e.getMessage());
+
+        try {
+            if (!scheduler.awaitTermination(5, TimeUnit.SECONDS)){
+                scheduler.shutdownNow();
             }
+        } catch (InterruptedException e){
+            scheduler.shutdownNow();
+            Thread.currentThread().interrupt();
         }
-        
-        activeProcesses.clear();
+
+        synchronized (activeProcesses){
+            // Para todos os processos ativos
+            for (Process process : activeProcesses.values()) {
+                if (process.isAlive()){
+                    process.destroyForcibly();
+                }
+            }
+            activeProcesses.clear();
+        }
+
         System.out.println("WorkerMonitor parado");
     }
     
