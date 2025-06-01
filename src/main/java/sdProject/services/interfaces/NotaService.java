@@ -1,10 +1,8 @@
 package sdProject.services.interfaces;
 
-import java.sql.SQLException;
-
-public interface NotaService {
-    boolean registrarNota(int alunoId, int disciplinaId, Double nota) throws SQLException, IllegalArgumentException;
-    Double consultarNota(int alunoId, int disciplinaId) throws SQLException, IllegalArgumentException;
-    Double calcularMediaAluno(int alunoId) throws SQLException;
-    Double calcularMediaDisciplina(int disciplinaId) throws SQLException;
+public interface NotaService extends AutoCloseable {
+    boolean registrarNota(int alunoId, int disciplinaId, Double nota);
+    Double consultarNota(int alunoId, int disciplinaId);
+    Double calcularMediaAluno(int alunoId);
+    Double calcularMediaDisciplina(int disciplinaId);
 }

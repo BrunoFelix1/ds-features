@@ -1,9 +1,21 @@
 package sdProject.models;
 
+import jakarta.persistence.*;
+
+@Entity
+@Table(name = "matricula")
 public class Matricula {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private int id;
+
+    @Column(name = "aluno_id", nullable = false)
     private int alunoId;
+
+    @Column(name = "disciplina_id", nullable = false)
     private int disciplinaId;
+
+    @Column
     private Double nota;
 
     public Matricula() {}

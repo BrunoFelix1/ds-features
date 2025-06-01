@@ -1,7 +1,15 @@
 package sdProject.models;
 
+import jakarta.persistence.*;
+
+@Entity
+@Table(name = "disciplina")
 public class Disciplina {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private int id;
+
+    @Column(nullable = false)
     private String nome;
 
     public Disciplina() {}

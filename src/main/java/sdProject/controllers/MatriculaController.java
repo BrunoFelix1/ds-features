@@ -3,91 +3,90 @@ package sdProject.controllers;
 import sdProject.models.Matricula;
 import sdProject.services.interfaces.MatriculaService;
 import sdProject.services.impl.MatriculaServiceImpl;
+import sdProject.dto.MatriculaDTO;
+import sdProject.dto.ResponseDTO;
 
-import java.sql.SQLException;
 import java.util.List;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.stream.Collectors;
 
-public class MatriculaController {
+public class MatriculaController implements AutoCloseable {
     
     private final MatriculaService matriculaService;
     
-    public MatriculaController() throws SQLException {
+    public MatriculaController() {
         this.matriculaService = new MatriculaServiceImpl();
     }
     
-    public Map<String, Object> matricularAluno(int alunoId, int disciplinaId) {
-        Map<String, Object> response = new HashMap<>();
+    public ResponseDTO<MatriculaDTO> matricularAluno(int alunoId, int disciplinaId) {
         try {
             Matricula matricula = matriculaService.matricularAluno(alunoId, disciplinaId);
-            response.put("status", "success");
-            response.put("message", "Matrícula realizada com sucesso");
-            response.put("data", matricula);
+            MatriculaDTO dto = convertToDTO(matricula);
+            return ResponseDTO.success("Matrícula realizada com sucesso", dto);
         } catch (IllegalArgumentException e) {
-            response.put("status", "error");
-            response.put("message", e.getMessage());
-        } catch (SQLException e) {
-            response.put("status", "error");
-            response.put("message", "Erro ao acessar o banco de dados: " + e.getMessage());
+            return ResponseDTO.error(e.getMessage());
+        } catch (Exception e) {
+            return ResponseDTO.error("Erro ao processar matrícula: " + e.getMessage());
         }
-        return response;
     }
     
-    public Map<String, Object> cancelarMatricula(int alunoId, int disciplinaId) {
-        Map<String, Object> response = new HashMap<>();
+    public ResponseDTO<Boolean> cancelarMatricula(int alunoId, int disciplinaId) {
         try {
             boolean cancelada = matriculaService.cancelarMatricula(alunoId, disciplinaId);
             if (cancelada) {
-                response.put("status", "success");
-                response.put("message", "Matrícula cancelada com sucesso");
+                return ResponseDTO.success("Matrícula cancelada com sucesso", true);
             } else {
-                response.put("status", "error");
-                response.put("message", "Não foi possível cancelar a matrícula");
+                return ResponseDTO.error("Não foi possível cancelar a matrícula");
             }
-        } catch (SQLException e) {
-            response.put("status", "error");
-            response.put("message", "Erro ao acessar o banco de dados: " + e.getMessage());
+        } catch (Exception e) {
+            return ResponseDTO.error("Erro ao cancelar matrícula: " + e.getMessage());
         }
-        return response;
     }
     
-    public Map<String, Object> listarMatriculasPorAluno(int alunoId) {
-        Map<String, Object> response = new HashMap<>();
+    public ResponseDTO<List<MatriculaDTO>> listarMatriculasPorAluno(int alunoId) {
         try {
             List<Matricula> matriculas = matriculaService.buscarMatriculasPorAluno(alunoId);
-            response.put("status", "success");
-            response.put("data", matriculas);
-        } catch (SQLException e) {
-            response.put("status", "error");
-            response.put("message", "Erro ao acessar o banco de dados: " + e.getMessage());
+            List<MatriculaDTO> dtos = matriculas.stream()
+                .map(this::convertToDTO)
+                .collect(Collectors.toList());
+            return ResponseDTO.success(dtos);
+        } catch (Exception e) {
+            return ResponseDTO.error("Erro ao listar matrículas: " + e.getMessage());
         }
-        return response;
     }
     
-    public Map<String, Object> listarMatriculasPorDisciplina(int disciplinaId) {
-        Map<String, Object> response = new HashMap<>();
+    public ResponseDTO<List<MatriculaDTO>> listarMatriculasPorDisciplina(int disciplinaId) {
         try {
             List<Matricula> matriculas = matriculaService.buscarMatriculasPorDisciplina(disciplinaId);
-            response.put("status", "success");
-            response.put("data", matriculas);
-        } catch (SQLException e) {
-            response.put("status", "error");
-            response.put("message", "Erro ao acessar o banco de dados: " + e.getMessage());
+            List<MatriculaDTO> dtos = matriculas.stream()
+                .map(this::convertToDTO)
+                .collect(Collectors.toList());
+            return ResponseDTO.success(dtos);
+        } catch (Exception e) {
+            return ResponseDTO.error("Erro ao listar matrículas: " + e.getMessage());
         }
-        return response;
     }
 
-    public Map<String, Object> verificarMatricula(int alunoId, int disciplinaId) {
-        Map<String, Object> response = new HashMap<>();
+    public ResponseDTO<Boolean> verificarMatricula(int alunoId, int disciplinaId) {
         try {
             boolean matriculado = matriculaService.verificarMatricula(alunoId, disciplinaId);
-            response.put("status", "success");
-            response.put("matriculado", matriculado);
-        } catch (SQLException e) {
-            response.put("status", "error");
-            response.put("message", "Erro ao acessar o banco de dados: " + e.getMessage());
+            return ResponseDTO.success(matriculado);
+        } catch (Exception e) {
+            return ResponseDTO.error("Erro ao verificar matrícula: " + e.getMessage());
         }
-        return response;
+    }
+
+    private MatriculaDTO convertToDTO(Matricula matricula) {
+        if (matricula == null) return null;
+        MatriculaDTO dto = new MatriculaDTO();
+        dto.setId(matricula.getId());
+        dto.setAlunoId(matricula.getAlunoId());
+        dto.setDisciplinaId(matricula.getDisciplinaId());
+        dto.setNota(matricula.getNota());
+        return dto;
+    }
+
+    @Override
+    public void close() throws Exception {
+        matriculaService.close();
     }
 }

@@ -1,11 +1,27 @@
 package sdProject.models;
 
+import jakarta.persistence.*;
+
+@Entity
+@Table(name = "aluno")
 public class Aluno {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private int id;
+
+    @Column(nullable = false)
     private String nome;
+
+    @Column(unique = true, nullable = false)
     private String cpf;
+
+    @Column(unique = true, nullable = false)
     private String matricula;
+
+    @Column(nullable = false)
     private boolean ativo;
+
+    @Column(name = "curso_id", nullable = false)
     private int cursoId;
 
     public Aluno() {}

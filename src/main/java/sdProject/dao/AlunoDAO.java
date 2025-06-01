@@ -1,151 +1,86 @@
 package sdProject.dao;
 
 import sdProject.models.Aluno;
-import java.sql.*;
-import java.util.*;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.TypedQuery;
+import java.util.List;
 
 public class AlunoDAO {
-    private Connection conn;
-    public AlunoDAO(Connection conn) { this.conn = conn; }
+    private EntityManager em;
 
-    public void salvar(Aluno aluno) throws SQLException {
-        String sql = "INSERT INTO aluno (nome, cpf, matricula, ativo, curso_id) VALUES (?, ?, ?, ?, ?)";
-        try (PreparedStatement stmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
-            stmt.setString(1, aluno.getNome());
-            stmt.setString(2, aluno.getCpf());
-            stmt.setString(3, aluno.getMatricula());
-            stmt.setBoolean(4, aluno.isAtivo());
-            stmt.setInt(5, aluno.getCursoId());
-            stmt.executeUpdate();
-            
-            try (ResultSet generatedKeys = stmt.getGeneratedKeys()) {
-                if (generatedKeys.next()) {
-                    aluno.setId(generatedKeys.getInt(1));
-                }
-            }
+    public AlunoDAO(EntityManager em) {
+        this.em = em;
+    }
+
+    public void salvar(Aluno aluno) {
+        try {
+            em.getTransaction().begin();
+            em.persist(aluno);
+            em.getTransaction().commit();
+        } catch (Exception e) {
+            em.getTransaction().rollback();
+            throw e;
         }
     }
 
-    public Aluno findById(int id) throws SQLException {
-        String sql = "SELECT * FROM aluno WHERE id = ?";
-        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
-            stmt.setInt(1, id);
-            try (ResultSet rs = stmt.executeQuery()) {
-                if (rs.next()) {
-                    Aluno aluno = new Aluno();
-                    aluno.setId(rs.getInt("id"));
-                    aluno.setNome(rs.getString("nome"));
-                    aluno.setCpf(rs.getString("cpf"));
-                    aluno.setMatricula(rs.getString("matricula"));
-                    aluno.setAtivo(rs.getBoolean("ativo"));
-                    aluno.setCursoId(rs.getInt("curso_id"));
-                    return aluno;
-                }
-            }
-        }
-        return null;
+    public Aluno findById(int id) {
+        return em.find(Aluno.class, id);
     }
 
-    public Aluno findByCpf(String cpf) throws SQLException {
-        String sql = "SELECT * FROM aluno WHERE cpf = ?";
-        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
-            stmt.setString(1, cpf);
-            try (ResultSet rs = stmt.executeQuery()) {
-                if (rs.next()) {
-                    Aluno aluno = new Aluno();
-                    aluno.setId(rs.getInt("id"));
-                    aluno.setNome(rs.getString("nome"));
-                    aluno.setCpf(rs.getString("cpf"));
-                    aluno.setMatricula(rs.getString("matricula"));
-                    aluno.setAtivo(rs.getBoolean("ativo"));
-                    aluno.setCursoId(rs.getInt("curso_id"));
-                    return aluno;
-                }
-            }
-        }
-        return null;
+    public Aluno findByCpf(String cpf) {
+        TypedQuery<Aluno> query = em.createQuery(
+            "SELECT a FROM Aluno a WHERE a.cpf = :cpf", Aluno.class);
+        query.setParameter("cpf", cpf);
+        List<Aluno> results = query.getResultList();
+        return results.isEmpty() ? null : results.get(0);
     }
     
-    public Aluno findByMatricula(String matricula) throws SQLException {
-        String sql = "SELECT * FROM aluno WHERE matricula = ?";
-        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
-            stmt.setString(1, matricula);
-            try (ResultSet rs = stmt.executeQuery()) {
-                if (rs.next()) {
-                    Aluno aluno = new Aluno();
-                    aluno.setId(rs.getInt("id"));
-                    aluno.setNome(rs.getString("nome"));
-                    aluno.setCpf(rs.getString("cpf"));
-                    aluno.setMatricula(rs.getString("matricula"));
-                    aluno.setAtivo(rs.getBoolean("ativo"));
-                    aluno.setCursoId(rs.getInt("curso_id"));
-                    return aluno;
-                }
-            }
-        }
-        return null;
+    public Aluno findByMatricula(String matricula) {
+        TypedQuery<Aluno> query = em.createQuery(
+            "SELECT a FROM Aluno a WHERE a.matricula = :matricula", Aluno.class);
+        query.setParameter("matricula", matricula);
+        List<Aluno> results = query.getResultList();
+        return results.isEmpty() ? null : results.get(0);
     }
     
-    public List<Aluno> listarTodos() throws SQLException {
-        List<Aluno> alunos = new ArrayList<>();
-        String sql = "SELECT * FROM aluno ORDER BY nome";
-        
-        try (Statement stmt = conn.createStatement();
-             ResultSet rs = stmt.executeQuery(sql)) {
-            while (rs.next()) {
-                Aluno aluno = new Aluno();
-                aluno.setId(rs.getInt("id"));
-                aluno.setNome(rs.getString("nome"));
-                aluno.setCpf(rs.getString("cpf"));
-                aluno.setMatricula(rs.getString("matricula"));
-                aluno.setAtivo(rs.getBoolean("ativo"));
-                aluno.setCursoId(rs.getInt("curso_id"));
-                alunos.add(aluno);
-            }
-        }
-        return alunos;
+    public List<Aluno> listarTodos() {
+        return em.createQuery("SELECT a FROM Aluno a ORDER BY a.nome", Aluno.class)
+                 .getResultList();
     }
     
-    public List<Aluno> findByCurso(int cursoId) throws SQLException {
-        List<Aluno> alunos = new ArrayList<>();
-        String sql = "SELECT * FROM aluno WHERE curso_id = ? ORDER BY nome";
-        
-        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
-            stmt.setInt(1, cursoId);
-            try (ResultSet rs = stmt.executeQuery()) {
-                while (rs.next()) {
-                    Aluno aluno = new Aluno();
-                    aluno.setId(rs.getInt("id"));
-                    aluno.setNome(rs.getString("nome"));
-                    aluno.setCpf(rs.getString("cpf"));
-                    aluno.setMatricula(rs.getString("matricula"));
-                    aluno.setAtivo(rs.getBoolean("ativo"));
-                    aluno.setCursoId(rs.getInt("curso_id"));
-                    alunos.add(aluno);
-                }
-            }
-        }
-        return alunos;
+    public List<Aluno> findByCurso(int cursoId) {
+        TypedQuery<Aluno> query = em.createQuery(
+            "SELECT a FROM Aluno a WHERE a.cursoId = :cursoId ORDER BY a.nome", Aluno.class);
+        query.setParameter("cursoId", cursoId);
+        return query.getResultList();
     }
     
-    public boolean atualizar(Aluno aluno) throws SQLException {
-        String sql = "UPDATE aluno SET nome = ?, cpf = ?, matricula = ?, ativo = ?, curso_id = ? WHERE id = ?";
-        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
-            stmt.setString(1, aluno.getNome());
-            stmt.setString(2, aluno.getCpf());
-            stmt.setString(3, aluno.getMatricula());
-            stmt.setBoolean(4, aluno.isAtivo());
-            stmt.setInt(5, aluno.getCursoId());
-            stmt.setInt(6, aluno.getId());
-            return stmt.executeUpdate() > 0;
+    public boolean atualizar(Aluno aluno) {
+        try {
+            em.getTransaction().begin();
+            em.merge(aluno);
+            em.getTransaction().commit();
+            return true;
+        } catch (Exception e) {
+            em.getTransaction().rollback();
+            throw e;
         }
     }
 
-    public boolean delete(int id) throws SQLException {
-        String sql = "DELETE FROM aluno WHERE id = ?";
-        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
-            stmt.setInt(1, id);
-            return stmt.executeUpdate() > 0;
+    public boolean delete(int id) {
+        try {
+            em.getTransaction().begin();
+            Aluno aluno = em.find(Aluno.class, id);
+            if (aluno != null) {
+                em.remove(aluno);
+                em.getTransaction().commit();
+                return true;
+            }
+            em.getTransaction().rollback();
+            return false;
+        } catch (Exception e) {
+            em.getTransaction().rollback();
+            throw e;
         }
     }
 }
