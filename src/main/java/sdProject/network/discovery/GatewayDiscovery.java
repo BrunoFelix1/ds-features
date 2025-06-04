@@ -101,6 +101,7 @@ public class GatewayDiscovery {
         }
     }
     
+    @SuppressWarnings("unchecked")
     private void handlePacket(byte[] data, InetAddress clientAddress, int clientPort) {
         try {
             

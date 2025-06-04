@@ -1,6 +1,7 @@
 package sdProject.network.workers.monitor;
 
 import sdProject.network.util.SerializationUtils;
+import sdProject.network.util.Connection;
 
 import java.io.IOException;
 import java.net.*;
@@ -21,7 +22,6 @@ public class WorkerMonitor {
     private final Map<String, Process> activeProcesses;
 
     private static final int UDP_TIMEOUT_MS = 5000;
-    private static final int MAX_PACKET_SIZE = 65507;
     
 
     
@@ -55,18 +55,13 @@ public class WorkerMonitor {
         request.put("operation", "getServices");
         request.put("serviceType", serviceType);
 
-        try (DatagramSocket udpSocket = new DatagramSocket()){
-            udpSocket.setSoTimeout(UDP_TIMEOUT_MS);
+        try (Connection connection = new Connection()){
+            connection.setSoTimeout(UDP_TIMEOUT_MS);
             InetAddress gwAddress = InetAddress.getByName(gatewayHost);
 
-            byte[] sendData = SerializationUtils.serialize(request);
-            DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length, gwAddress, gatewayPort);
-            udpSocket.send(sendPacket);
+            connection.sendUDP(request, gwAddress, gatewayPort);
 
-            byte[] receiveBuffer = new byte[MAX_PACKET_SIZE];
-            DatagramPacket receivePacket = new DatagramPacket(receiveBuffer, receiveBuffer.length);
-            udpSocket.receive(receivePacket);
-
+            DatagramPacket receivePacket = connection.receiveUDP();
             byte[] actualData = new byte[receivePacket.getLength()];
             System.arraycopy(receivePacket.getData(), receivePacket.getOffset(), actualData, 0, receivePacket.getLength());
 
