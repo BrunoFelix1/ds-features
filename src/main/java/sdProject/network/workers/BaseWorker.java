@@ -1,5 +1,6 @@
 package sdProject.network.workers;
 
+import sdProject.network.util.Connection;
 import sdProject.network.util.SerializationUtils;
 
 import java.io.*;
@@ -25,7 +26,6 @@ public abstract class BaseWorker {
     private final int gatewayPort;
 
     private static final int UDP_TIMEOUT_MS = 5000; // Tempo para respostas do gateway
-    private static final int MAX_PACKET_SIZE = 65507;
     
     public BaseWorker(int port, String workerName, String serviceId, int threadPoolSize, 
                      String gatewayHost, int gatewayPort) {
@@ -69,19 +69,15 @@ public abstract class BaseWorker {
         }
     }
 
+    @SuppressWarnings("unchecked")
     private Map<String, Object> sendAndReceiveUDP(Map<String, Object> requestPayload) throws IOException, ClassNotFoundException {
-        try (DatagramSocket udpSocket = new DatagramSocket()){
-            udpSocket.setSoTimeout(UDP_TIMEOUT_MS);
+        try (Connection connection = new Connection()) {
+            connection.setSoTimeout(UDP_TIMEOUT_MS);
             InetAddress gatewayAddress = InetAddress.getByName(gatewayHost);
-
-            byte[] sendData = SerializationUtils.serialize(requestPayload);
-            DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length, gatewayAddress, gatewayPort);
-            udpSocket.send(sendPacket);
-
-            byte[] receiveBuffer = new byte[MAX_PACKET_SIZE];
-            DatagramPacket receivePacket = new DatagramPacket(receiveBuffer, receiveBuffer.length);
-            udpSocket.receive(receivePacket);
-
+            
+            connection.sendUDP(requestPayload, gatewayAddress, gatewayPort);
+            
+            DatagramPacket receivePacket = connection.receiveUDP();
             byte[] actualData = new byte[receivePacket.getLength()];
             System.arraycopy(receivePacket.getData(), receivePacket.getOffset(), actualData, 0, receivePacket.getLength());
 
@@ -155,34 +151,33 @@ public abstract class BaseWorker {
     }
     
 
+    @SuppressWarnings("unchecked")
     protected void handleClient(Socket clientSocket) {
-        try (ObjectInputStream in = new ObjectInputStream(clientSocket.getInputStream());
-             ObjectOutputStream out = new ObjectOutputStream(clientSocket.getOutputStream())) {
-            
+        try (Connection connection = new Connection(clientSocket)) {
             // Lê a requisição do cliente
-            Map<String, Object> request = (Map<String, Object>) in.readObject();
+            Map<String, Object> request = (Map<String, Object>) connection.receive();
             
             // Processa a requisição
             Map<String, Object> response = processRequest(request);
             
             // Envia a resposta
-            out.writeObject(response);
+            connection.send(response);
             
         } catch (IOException | ClassNotFoundException e) {
             System.err.println("Erro ao processar cliente: " + e.getMessage());
             e.printStackTrace();
-        } finally {
-            try {
-                clientSocket.close();
-            } catch (IOException e) {
-                System.err.println("Erro ao fechar socket: " + e.getMessage());
-            }
         }
     }
     
 
     protected abstract Map<String, Object> processRequest(Map<String, Object> request);
-    
+
+    protected Map<String, Object> createSuccessResponse(String message) {
+        Map<String, Object> response = new HashMap<>();
+        response.put("status", "success");
+        response.put("message", message);
+        return response;
+    }
 
     // Esse aí para o worker
     public void stop() {

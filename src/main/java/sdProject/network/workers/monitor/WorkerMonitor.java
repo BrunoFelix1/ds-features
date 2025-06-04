@@ -2,10 +2,7 @@ package sdProject.network.workers.monitor;
 
 import sdProject.network.util.SerializationUtils;
 
-import javax.xml.crypto.Data;
 import java.io.IOException;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
 import java.net.*;
 import java.util.HashMap;
 import java.util.Map;
@@ -50,6 +47,7 @@ public class WorkerMonitor {
         System.out.println("WorkerMonitor iniciado. Monitorando workers...");
     }
 
+    @SuppressWarnings("unchecked")
     private Map<String, String> getAvailableServicesUDP(String serviceType){
         Map<String, String> result = new HashMap<>();
         Map<String, Object> request = new HashMap<>();

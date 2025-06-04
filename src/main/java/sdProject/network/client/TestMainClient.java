@@ -1,10 +1,9 @@
 package sdProject.network.client;
 
+import sdProject.network.util.Connection;
 import sdProject.network.util.SerializationUtils;
 
 import java.io.IOException;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
 import java.net.*;
 import java.util.HashMap;
 import java.util.Map;
@@ -17,45 +16,34 @@ public class TestMainClient {
     
     private final String gatewayHost;
     private final int gatewayPort;
-    
-    // Cache de localização dos serviços (serviço -> endereço:porta)
+      // Cache de localização dos serviços (serviço -> endereço:porta)
     private final Map<String, ServiceLocation> serviceCache = new ConcurrentHashMap<>();
-
+    
     private static final int UDP_TIMEOUT_MS = 5000;
-    private static final int MAX_PACKET_SIZE = 65507;
 
     public TestMainClient(String gatewayHost, int gatewayPort) {
-        this.gatewayHost = gatewayHost; // ISSO AQUI É O UNICO IP DA APLICAÇÃO BASICAMENTE
+        this.gatewayHost = gatewayHost; // ISSO AQUI É O UNICO IP DA APLICAÇÃO BASICAMENTE, é setado nas mains dos serviços
         this.gatewayPort = gatewayPort;
-    }
-
+    }    @SuppressWarnings("unchecked") // é so pra nao aparecer o erro do cast de objeto para map ali no retorno
     private Map<String, Object> sendToGatewayUDP(Map<String, Object> requestPayload) throws IOException, ClassNotFoundException {
-        try (DatagramSocket udpSocket = new DatagramSocket()){
-            udpSocket.setSoTimeout(UDP_TIMEOUT_MS);
+        try (Connection connection = new Connection()) {
+            connection.setSoTimeout(UDP_TIMEOUT_MS);
             InetAddress gwAddress = InetAddress.getByName(gatewayHost);
-
-            byte[] sendData = SerializationUtils.serialize(requestPayload);
-            DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length, gwAddress, gatewayPort);
-            udpSocket.send(sendPacket);
-
-            byte[] receiveBuffer = new byte[MAX_PACKET_SIZE];
-            DatagramPacket receivePacket = new DatagramPacket(receiveBuffer, receiveBuffer.length);
-            udpSocket.receive(receivePacket);
-
+            
+            connection.sendUDP(requestPayload, gwAddress, gatewayPort);
+            DatagramPacket receivePacket = connection.receiveUDP();
+            
             byte[] actualData = new byte[receivePacket.getLength()];
             System.arraycopy(receivePacket.getData(), receivePacket.getOffset(), actualData, 0, receivePacket.getLength());
-
+            
             return (Map<String, Object>) SerializationUtils.deserialize(actualData);
         }
     }
-    
-    private ServiceLocation discoverService(String serviceName) throws IOException, ClassNotFoundException {
+      private ServiceLocation discoverService(String serviceName) throws IOException, ClassNotFoundException {
         ServiceLocation cachedLocation = serviceCache.get(serviceName);
         if (cachedLocation != null) {
             // disponibilidae dele aqui
-            try {
-                Socket testSocket = new Socket(cachedLocation.getHost(), cachedLocation.getPort());
-                testSocket.close();
+            try (Connection testConnection = new Connection(cachedLocation.getHost(), cachedLocation.getPort())) {
                 return cachedLocation;  // Serviço ainda está ativo
             } catch (ConnectException e) {
                 // Serviço não está disponível, entao a gnt remove ele
@@ -86,6 +74,7 @@ public class TestMainClient {
         }
     }
     
+    @SuppressWarnings("unchecked")
     private ServiceLocation findAlternativeService(String serviceType) throws IOException, ClassNotFoundException {
         System.out.println("Procurando serviços alternativos para " + serviceType);
         
@@ -116,6 +105,7 @@ public class TestMainClient {
         throw new IOException("Nenhum serviço do tipo " + serviceType + " disponível via Gateway.");
     }
     
+    @SuppressWarnings("unchecked")
     public Map<String, Object> callService(String serviceName, Map<String, Object> request) 
             throws IOException, ClassNotFoundException {
         
@@ -125,14 +115,9 @@ public class TestMainClient {
         while (retryCount < maxRetries) {
             try {
                 ServiceLocation location = discoverService(serviceName);
-                
-                try (Socket socket = new Socket(location.getHost(), location.getPort());
-                     ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
-                     ObjectInputStream in = new ObjectInputStream(socket.getInputStream())) {
-                    
-                    out.writeObject(request);
-                    
-                    return (Map<String, Object>) in.readObject();
+                  try (Connection connection = new Connection(location.getHost(), location.getPort())) {
+                    connection.send(request);
+                    return (Map<String, Object>) connection.receive();
                 } catch (ConnectException e) {
                     serviceCache.remove(serviceName);
                     System.out.println("Falha na conexão com " + serviceName + ". Tentando novamente...");
