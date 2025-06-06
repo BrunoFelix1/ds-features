@@ -1,10 +1,10 @@
 package sdProject.network.client;
 
+import sdProject.network.util.Connection;
+import sdProject.network.util.SerializationUtils;
+
 import java.io.IOException;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
-import java.net.Socket;
-import java.net.ConnectException;
+import java.net.*;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -16,22 +16,34 @@ public class TestMainClient {
     
     private final String gatewayHost;
     private final int gatewayPort;
-    
-    // Cache de localização dos serviços (serviço -> endereço:porta)
+      // Cache de localização dos serviços (serviço -> endereço:porta)
     private final Map<String, ServiceLocation> serviceCache = new ConcurrentHashMap<>();
     
+    private static final int UDP_TIMEOUT_MS = 5000;
+
     public TestMainClient(String gatewayHost, int gatewayPort) {
-        this.gatewayHost = gatewayHost; // ISSO AQUI É O UNICO IP DA APLICAÇÃO BASICAMENTE
+        this.gatewayHost = gatewayHost; // ISSO AQUI É O UNICO IP DA APLICAÇÃO BASICAMENTE, é setado nas mains dos serviços
         this.gatewayPort = gatewayPort;
+    }    @SuppressWarnings("unchecked") // é so pra nao aparecer o erro do cast de objeto para map ali no retorno
+    private Map<String, Object> sendToGatewayUDP(Map<String, Object> requestPayload) throws IOException, ClassNotFoundException {
+        try (Connection connection = new Connection()) {
+            connection.setSoTimeout(UDP_TIMEOUT_MS);
+            InetAddress gwAddress = InetAddress.getByName(gatewayHost);
+            
+            connection.sendUDP(requestPayload, gwAddress, gatewayPort);
+            DatagramPacket receivePacket = connection.receiveUDP();
+            
+            byte[] actualData = new byte[receivePacket.getLength()];
+            System.arraycopy(receivePacket.getData(), receivePacket.getOffset(), actualData, 0, receivePacket.getLength());
+            
+            return (Map<String, Object>) SerializationUtils.deserialize(actualData);
+        }
     }
-    
-    private ServiceLocation discoverService(String serviceName) throws IOException, ClassNotFoundException {
+      private ServiceLocation discoverService(String serviceName) throws IOException, ClassNotFoundException {
         ServiceLocation cachedLocation = serviceCache.get(serviceName);
         if (cachedLocation != null) {
             // disponibilidae dele aqui
-            try {
-                Socket testSocket = new Socket(cachedLocation.getHost(), cachedLocation.getPort());
-                testSocket.close();
+            try (Connection testConnection = new Connection(cachedLocation.getHost(), cachedLocation.getPort())) {
                 return cachedLocation;  // Serviço ainda está ativo
             } catch (ConnectException e) {
                 // Serviço não está disponível, entao a gnt remove ele
@@ -43,64 +55,57 @@ public class TestMainClient {
         Map<String, Object> request = new HashMap<>();
         request.put("operation", "discover");
         request.put("serviceName", serviceName);
-        
-        try (Socket socket = new Socket(gatewayHost, gatewayPort);
-             ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
-             ObjectInputStream in = new ObjectInputStream(socket.getInputStream())) {
-            
-            out.writeObject(request);
-            
-            Map<String, Object> response = (Map<String, Object>) in.readObject();
-            
-            if ("success".equals(response.get("status"))) {
-                String serviceAddress = (String) response.get("serviceAddress");
+
+        try {
+            Map<String, Object> response = sendToGatewayUDP(request);
+            if ("success".equals(response.get("status"))){
+                String serviceAddress = (String) response.get("serviceAddress"); // Aqui recebemos o enderço TCP do Worker
                 ServiceLocation location = new ServiceLocation(serviceAddress);
-                
                 serviceCache.put(serviceName, location);
-                
-                System.out.println("Serviço " + serviceName + " descoberto em " + serviceAddress);
+                System.out.println("Serviço " + serviceName + " descoberto no endereço " + serviceAddress);
                 return location;
             } else {
+                System.err.println("Falha ao descobrir serviço " + serviceName + " " + response.get("message"));
                 return findAlternativeService(serviceName);
             }
+        } catch (SocketTimeoutException e){
+            System.err.println("Timeout ao descobrir serviço " + serviceName + " do Gateway UDP.");
+            return findAlternativeService(serviceName);
         }
     }
     
+    @SuppressWarnings("unchecked")
     private ServiceLocation findAlternativeService(String serviceType) throws IOException, ClassNotFoundException {
         System.out.println("Procurando serviços alternativos para " + serviceType);
         
         Map<String, Object> request = new HashMap<>();
         request.put("operation", "getServices");
         request.put("serviceType", serviceType);
-        
-        try (Socket socket = new Socket(gatewayHost, gatewayPort);
-             ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
-             ObjectInputStream in = new ObjectInputStream(socket.getInputStream())) {
-            
-            out.writeObject(request);
-            
-            Map<String, Object> response = (Map<String, Object>) in.readObject();
-            
-            if ("success".equals(response.get("status"))) {
+
+        try {
+            Map<String, Object> response = sendToGatewayUDP(request);
+            if ("success".equals(response.get("status"))){
                 Map<String, String> services = (Map<String, String>) response.get("services");
-                
-                if (services != null && !services.isEmpty()) {
-                    Map.Entry<String, String> entry = services.entrySet().iterator().next();
-                    String serviceName = entry.getKey();
-                    String serviceAddress = entry.getValue();
-                    
+                if (services != null && !services.isEmpty()){
+                    // Aqui pega o primeiro serviço alternativo encontrado
+                   Map.Entry<String, String> entry = services.entrySet().iterator().next();
+                   String altServiceName = entry.getKey();
+                   String serviceAddress = entry.getValue(); // Endereço TCP do worker
+
                     ServiceLocation location = new ServiceLocation(serviceAddress);
-                    serviceCache.put(serviceName, location);
-                    
-                    System.out.println("Usando serviço alternativo " + serviceName + " em " + serviceAddress);
+                    serviceCache.put(serviceType, location);
+                    System.out.println("Usando serviço alternativo " + altServiceName + " em " + serviceAddress + " para tipo " + serviceType);
                     return location;
                 }
             }
-            
-            throw new IOException("Nenhum serviço do tipo " + serviceType + " disponível");
+            System.err.println("Gateway não retornou serviços alternativos para " + serviceType + response.get("message"));
+        } catch (SocketTimeoutException e){
+            System.err.println("Timeout ao buscar serviços alternativos no Gateway para " + serviceType);
         }
+        throw new IOException("Nenhum serviço do tipo " + serviceType + " disponível via Gateway.");
     }
     
+    @SuppressWarnings("unchecked")
     public Map<String, Object> callService(String serviceName, Map<String, Object> request) 
             throws IOException, ClassNotFoundException {
         
@@ -110,14 +115,9 @@ public class TestMainClient {
         while (retryCount < maxRetries) {
             try {
                 ServiceLocation location = discoverService(serviceName);
-                
-                try (Socket socket = new Socket(location.getHost(), location.getPort());
-                     ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
-                     ObjectInputStream in = new ObjectInputStream(socket.getInputStream())) {
-                    
-                    out.writeObject(request);
-                    
-                    return (Map<String, Object>) in.readObject();
+                  try (Connection connection = new Connection(location.getHost(), location.getPort())) {
+                    connection.send(request);
+                    return (Map<String, Object>) connection.receive();
                 } catch (ConnectException e) {
                     serviceCache.remove(serviceName);
                     System.out.println("Falha na conexão com " + serviceName + ". Tentando novamente...");
