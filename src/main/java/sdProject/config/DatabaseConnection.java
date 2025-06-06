@@ -14,7 +14,6 @@ public class DatabaseConnection {
     private static Connection connection = null;
 
     static {
-        //Localizando arquivo application properties
         try (InputStream input = DatabaseConnection.class.getClassLoader().getResourceAsStream("application.properties")) {
             if (input == null) {
                 System.out.println("Não foi possível encontrar o arquivo application.properties");
@@ -26,7 +25,6 @@ public class DatabaseConnection {
         }
     }
 
-    //Obter uma conexão com o banco de dados
     public static Connection getConnection() throws SQLException {
         if (connection == null || connection.isClosed()) {
             String url = properties.getProperty("db.url");
@@ -38,7 +36,6 @@ public class DatabaseConnection {
         return connection;
     }
 
-    //Executa as migrations no banco de dados
     public static void runMigrations() {
         String url = properties.getProperty("db.url");
         String username = properties.getProperty("db.username");
@@ -53,7 +50,6 @@ public class DatabaseConnection {
         System.out.println("Migrações aplicadas com sucesso!");
     }
 
-    //Fecha conexão
     public static void closeConnection() {
         if (connection != null) {
             try {

@@ -5,8 +5,6 @@ import java.sql.SQLException;
 import java.util.Map;
 import java.util.List;
 
-//Interface dos serviços de histórico
-
 public interface HistoricoService {
     Map<Disciplina, Double> gerarHistoricoCompleto(int alunoId) throws SQLException, IllegalArgumentException;
     Map<Disciplina, Double> listarDisciplinasAprovadas(int alunoId) throws SQLException;
