@@ -8,15 +8,23 @@ import java.util.Scanner;
 import sdProject.config.DatabaseConnection;
 import sdProject.models.Disciplina;
 import sdProject.models.Matricula;
-import sdProject.services.impl.HistoricoServiceImpl;
-import sdProject.services.impl.MatriculaServiceImpl;
-import sdProject.services.impl.NotaServiceImpl;
-import sdProject.services.interfaces.HistoricoService;
-import sdProject.services.interfaces.MatriculaService;
-import sdProject.services.interfaces.NotaService;
+import sdProject.network.client.TestMainClient;
 
 public class App {
+    private static TestMainClient cliente; //Cliente distribuído como variável global
+    
     public static void main(String[] args) {
+
+        //Instancia o cliente, com o host e a porta do gateway com quem ele vai se comunicar
+        String gatewayHost = "localhost";
+        int gatewayPort = 8080;
+        
+        // Verificar se host e porta foram passados como argumentos
+        if (args.length >= 2) {
+            gatewayHost = args[0];
+            gatewayPort = Integer.parseInt(args[1]);
+        }
+        cliente = new TestMainClient(gatewayHost, gatewayPort); //Inicializa cliente global
 
         //Migrations 
         System.out.println("Iniciando aplicação");
@@ -72,290 +80,381 @@ public class App {
         scanner.close();
     }
 
-    //Funções das subopções de cada serviço 
-
+    // MENU MATRÍCULA 
     public static void menuMatricula(Integer escolhaDoSubservico, Scanner scanner) {
         escolhaDoSubservico = -1;
 
-        
-        try {
-            // Instanciando a implementação
-            MatriculaService matriculaService = new MatriculaServiceImpl();
+        do{
+            System.out.println("Qual subserviço você quer acessar?");
+            System.out.println("1.Matricular aluno \n" +
+            "2.Verificar matrícula \n" +
+            "3.Listar matrículas por aluno \n" +
+            "4.Listar matrículas por disciplina \n" +
+            "0.Voltar");
 
-            do{
-                System.out.println("Qual subserviço você quer acessar?");
-                System.out.println("1.Verificar matrícula \n" +
-                "2.Listar matrículas por aluno \n" +
-                "3.Listar matrículas por disciplina \n" +
-                "0.Voltar");
+            escolhaDoSubservico = scanner.nextInt();
+
+            if (escolhaDoSubservico == 0) {
+                System.out.println("Voltando...");
+                break;
+            }
+
+            System.out.println("Digite o ID do aluno: ");
+            int alunoId = scanner.nextInt();
+            System.out.println("Digite o ID da disciplina: ");
+            int disciplinaId = scanner.nextInt();
     
-                escolhaDoSubservico = scanner.nextInt();
-    
-                System.out.println("Digite o ID do aluno: ");
-                int alunoId = scanner.nextInt();
-                System.out.println("Digite o ID da disciplina: ");
-                int disciplinaId = scanner.nextInt();
-        
-                switch (escolhaDoSubservico) {
-                    case 1:
-                        System.out.println("Verificando matrícula do aluno:" + alunoId + " . Na disciplina:" + disciplinaId);
+            switch (escolhaDoSubservico) {
+                case 1:
+                    System.out.println("Matriculando aluno " + alunoId + " na disciplina " + disciplinaId);
+                    
+                    //CHAMA O CLIENTE DISTRIBUÍDO
+                    Map<String, Object> resultadoMatricula = cliente.matricularAluno(alunoId, disciplinaId);
+                    
+                    if ("success".equals(resultadoMatricula.get("status"))) {
+                        System.out.println("Matrícula realizada com sucesso!");
+                        System.out.println("Mensagem: " + resultadoMatricula.get("message"));
+                    } else {
+                        System.out.println("Erro na matrícula: " + resultadoMatricula.get("message"));
+                    }
+                    break;
+                    
+                case 2:
+                    System.out.println("Verificando matrícula do aluno " + alunoId + " na disciplina " + disciplinaId);
+                    
+                    //Criar nova operação para verificar matrícula
+                    Map<String, Object> resultadoVerificar = chamarServicoMatricula("verificar", alunoId, disciplinaId, null);
+                    
+                    if ("success".equals(resultadoVerificar.get("status"))) {
+                        boolean matriculado = (Boolean) resultadoVerificar.get("matriculado");
+                        System.out.println("Aluno matriculado? " + matriculado);
+                    } else {
+                        System.out.println("Erro ao verificar: " + resultadoVerificar.get("message"));
+                    }
+                    break;
+                    
+                case 3:
+                    System.out.println("Listando matrículas do aluno " + alunoId);
+                    
+                    //Criar nova operação para listar por aluno
+                    Map<String, Object> resultadoListarAluno = chamarServicoMatricula("listarPorAluno", alunoId, null, null);
+                    
+                    if ("success".equals(resultadoListarAluno.get("status"))) {
+                        @SuppressWarnings("unchecked")
+                        List<Map<String, Object>> matriculas = (List<Map<String, Object>>) resultadoListarAluno.get("matriculas");
                         
-                        boolean resultado = matriculaService.verificarMatricula(alunoId, disciplinaId);
-                        System.out.println("Aluno matriculado? " + resultado);
-    
-                        break;
-                    case 2:
-                        System.out.println("Listando matrículas do aluno:" + alunoId);
-    
-                        List<Matricula> matriculasPorAluno = matriculaService.buscarMatriculasPorAluno(alunoId);
-                        // Exibindo as matrículas
-                        if (matriculasPorAluno.isEmpty()) {
+                        if (matriculas.isEmpty()) {
                             System.out.println("Nenhuma matrícula encontrada para o aluno ID " + alunoId);
                         } else {
-                            for (Matricula matricula : matriculasPorAluno) {
-                                System.out.println("Disciplina ID: " + matricula.getDisciplinaId() + " | Nota: " + matricula.getNota());
+                            for (Map<String, Object> matricula : matriculas) {
+                                System.out.println("Disciplina ID: " + matricula.get("disciplinaId") + " | Nota: " + matricula.get("nota"));
                             }
                         }
-    
-                        break;
-                    case 3:
-                        System.out.println("Listando matrículas por disciplina...");
-
-                        // Chamando o método para buscar matrículas por disciplina
-                        List<Matricula> matriculasPorDisciplina = matriculaService.buscarMatriculasPorDisciplina(disciplinaId);
-
-                        // Exibindo as matrículas encontradas
-                        if (matriculasPorDisciplina.isEmpty()) {
+                    } else {
+                        System.out.println("Erro ao listar: " + resultadoListarAluno.get("message"));
+                    }
+                    break;
+                    
+                case 4:
+                    System.out.println("Listando matrículas da disciplina " + disciplinaId);
+                    
+                    //Criar nova operação para listar por disciplina
+                    Map<String, Object> resultadoListarDisciplina = chamarServicoMatricula("listarPorDisciplina", null, disciplinaId, null);
+                    
+                    if ("success".equals(resultadoListarDisciplina.get("status"))) {
+                        @SuppressWarnings("unchecked")
+                        List<Map<String, Object>> matriculas = (List<Map<String, Object>>) resultadoListarDisciplina.get("matriculas");
+                        
+                        if (matriculas.isEmpty()) {
                             System.out.println("Nenhuma matrícula encontrada para a disciplina ID " + disciplinaId);
                         } else {
                             System.out.println("Matrículas da disciplina ID " + disciplinaId + ":");
-                            for (Matricula matricula : matriculasPorDisciplina) {
-                                System.out.println("Aluno ID: " + matricula.getAlunoId() + " | Nota: " + matricula.getNota());
+                            for (Map<String, Object> matricula : matriculas) {
+                                System.out.println("Aluno ID: " + matricula.get("alunoId") + " | Nota: " + matricula.get("nota"));
                             }
                         }
-
-                        break;
-                    case 0:
-                        System.out.println("Voltando...");
-                        break;
-                    default:
-                        System.out.println("Opção inválida, tente novamente.");
-                }
-            } while (escolhaDoSubservico != 0);
-
-        } catch (SQLException e) {
-            // TODO: handle exception
-            e.printStackTrace();
-        }
-        
+                    } else {
+                        System.out.println("Erro ao listar: " + resultadoListarDisciplina.get("message"));
+                    }
+                    break;
+                    
+                default:
+                    System.out.println("Opção inválida, tente novamente.");
+            }
+        } while (escolhaDoSubservico != 0);
     }
 
+    //MENU NOTA - Usando cliente distribuído
     public static void menuNota(Integer escolhaDoSubservico, Scanner scanner) {
         escolhaDoSubservico = -1;
 
-        try {
+        do{
+            System.out.println("Qual subserviço você quer acessar?");
+            System.out.println("1.Registrar nota \n" +
+            "2.Consultar nota \n" +
+            "3.Calcular média aluno \n" +
+            "4.Calcular média disciplina \n" +
+            "0.Voltar");
 
-            // Instanciando a implementação
-            NotaService notaService = new NotaServiceImpl();
+            escolhaDoSubservico = scanner.nextInt();
 
-            do{
-                System.out.println("Qual subserviço você quer acessar?");
-                System.out.println("1.Consultar nota \n" +
-                "2.Calcular média aluno \n" +
-                "3.Calcular média disciplina \n" +
-                "0.Voltar");
-    
-                escolhaDoSubservico = scanner.nextInt();
+            if (escolhaDoSubservico == 0) {
+                System.out.println("Voltando...");
+                break;
+            }
 
-                System.out.println("Digite o ID do aluno: ");
-                int alunoId = scanner.nextInt();
-                System.out.println("Digite o ID da disciplina: ");
-                int disciplinaId = scanner.nextInt(); 
-    
-                switch (escolhaDoSubservico) {
-                    case 1:
-                        System.out.println("Consultando nota...");
+            System.out.println("Digite o ID do aluno: ");
+            int alunoId = scanner.nextInt();
+            System.out.println("Digite o ID da disciplina: ");
+            int disciplinaId = scanner.nextInt(); 
 
-                        // Chamando o método para consultar nota
-                        Double nota = notaService.consultarNota(alunoId, disciplinaId);
-
-                        // Exibindo resultado ao usuário
-                        if (nota != null) {
-                            System.out.println("Nota do aluno " + alunoId + " na disciplina " + disciplinaId + ": " + nota);
+            switch (escolhaDoSubservico) {
+                case 1:
+                    System.out.println("Digite a nota: ");
+                    double nota = scanner.nextDouble();
+                    
+                    //CHAMA O CLIENTE DISTRIBUÍDO
+                    Map<String, Object> resultadoNota = cliente.registrarNota(alunoId, disciplinaId, nota);
+                    
+                    if ("success".equals(resultadoNota.get("status"))) {
+                        System.out.println("Nota registrada com sucesso!");
+                        System.out.println("Mensagem: " + resultadoNota.get("message"));
+                    } else {
+                        System.out.println("Erro ao registrar nota: " + resultadoNota.get("message"));
+                    }
+                    break;
+                    
+                case 2:
+                    System.out.println("Consultando nota...");
+                    
+                    Map<String, Object> resultadoConsulta = chamarServicoNota("consultar", alunoId, disciplinaId, null);
+                    
+                    if ("success".equals(resultadoConsulta.get("status"))) {
+                        Double notaConsultada = (Double) resultadoConsulta.get("nota");
+                        if (notaConsultada != null) {
+                            System.out.println("Nota do aluno " + alunoId + " na disciplina " + disciplinaId + ": " + notaConsultada);
                         } else {
-                            System.out.println("Nota não encontrada para o aluno ID " + alunoId + " na disciplina ID " + disciplinaId);
+                            System.out.println("Nota não encontrada");
                         }
-
-                        break;
-                    case 2:
-                        System.out.println("Calculando média do aluno...");
-
-                        // Chamando o método para calcular a média do aluno
-                        Double mediaDoAluno = notaService.calcularMediaAluno(alunoId);
-
-                        // Exibindo resultado ao usuário
-                        if (mediaDoAluno != null) {
-                            System.out.println("Média do aluno ID " + alunoId + ": " + mediaDoAluno);
+                    } else {
+                        System.out.println("Erro ao consultar: " + resultadoConsulta.get("message"));
+                    }
+                    break;
+                    
+                case 3:
+                    System.out.println("Calculando média do aluno...");
+                    
+                    Map<String, Object> resultadoMediaAluno = chamarServicoNota("mediaAluno", alunoId, null, null);
+                    
+                    if ("success".equals(resultadoMediaAluno.get("status"))) {
+                        Double media = (Double) resultadoMediaAluno.get("media");
+                        if (media != null) {
+                            System.out.println("Média do aluno ID " + alunoId + ": " + media);
                         } else {
-                            System.out.println("Não foi possível calcular a média para o aluno ID " + alunoId);
+                            System.out.println("Não foi possível calcular a média");
                         }
-
-                        break;
-                    case 3:
-                        System.out.println("Calculando média da disciplina...");
-
-                        // Chamando o método para calcular a média da disciplina
-                        Double mediaDaDisciplina = notaService.calcularMediaDisciplina(disciplinaId);
-
-                        // Exibindo resultado ao usuário
-                        if (mediaDaDisciplina != null) {
-                            System.out.println("Média da disciplina ID " + disciplinaId + ": " + mediaDaDisciplina);
+                    } else {
+                        System.out.println("Erro ao calcular média: " + resultadoMediaAluno.get("message"));
+                    }
+                    break;
+                    
+                case 4:
+                    System.out.println("Calculando média da disciplina...");
+                    
+                    Map<String, Object> resultadoMediaDisciplina = chamarServicoNota("mediaDisciplina", null, disciplinaId, null);
+                    
+                    if ("success".equals(resultadoMediaDisciplina.get("status"))) {
+                        Double media = (Double) resultadoMediaDisciplina.get("media");
+                        if (media != null) {
+                            System.out.println("Média da disciplina ID " + disciplinaId + ": " + media);
                         } else {
-                            System.out.println("Não foi possível calcular a média para a disciplina ID " + disciplinaId);
+                            System.out.println("Não foi possível calcular a média");
                         }
+                    } else {
+                        System.out.println("Erro ao calcular média: " + resultadoMediaDisciplina.get("message"));
+                    }
+                    break;
+                    
+                default:
+                    System.out.println("Opção inválida, tente novamente.");
+                    break;
+            }
 
-                        break;
-                    case 0:
-                        System.out.println("Voltando...");
-                        break;
-                
-                    default:
-                        System.out.println("Opção inválida, tente novamente.");
-                        break;
-                }
-    
-            } while (escolhaDoSubservico != 0);
-
-        } catch (SQLException e) {
-            // TODO: handle exception
-            e.printStackTrace();
-        }
-
-           
+        } while (escolhaDoSubservico != 0);
     }
 
+    //MENU HISTÓRICO 
     public static void menuHistorico(Integer escolhaDoSubservico, Scanner scanner){
         escolhaDoSubservico = -1;
 
-        try {
-            // Instanciando a implementação
-            HistoricoService historicoService = new HistoricoServiceImpl();
+        do{
+            System.out.println("Qual subserviço você quer acessar?");
+            System.out.println("1.Gerar histórico completo \n" +
+            "2.Listar disciplinas aprovadas \n" +
+            "3.Listar disciplinas reprovadas \n" +
+            "4.Listar disciplinas em curso \n" +
+            "5.Calcular coeficiente de rendimento \n" +
+            "0.Voltar");
 
-            do{
-    
-                System.out.println("Qual subserviço você quer acessar?");
-                System.out.println("1.Gerar histórico completo \n" +
-                "2.Listar disciplinas aprovadas \n" +
-                "3.Listar disciplinas reprovadas \n" +
-                "4.Listar disciplinas em curso \n" +
-                "5.Calcular coeficiente de rendimento \n" +
-                "0.Voltar");
-    
-                escolhaDoSubservico = scanner.nextInt();
+            escolhaDoSubservico = scanner.nextInt();
 
-                System.out.println("Digite o ID do aluno: ");
-                int alunoId = scanner.nextInt(); 
-    
-                switch (escolhaDoSubservico) {
-                    case 1:
-                        System.out.println("Gerando histórico completo...");
+            if (escolhaDoSubservico == 0) {
+                System.out.println("Voltando...");
+                break;
+            }
 
-                        // Chamando o método para gerar o histórico completo
-                        Map<Disciplina, Double> historico = historicoService.gerarHistoricoCompleto(alunoId);
+            System.out.println("Digite o ID do aluno: ");
+            int alunoId = scanner.nextInt(); 
 
-                        // Exibindo o histórico do aluno
+            switch (escolhaDoSubservico) {
+                case 1:
+                    System.out.println("Gerando histórico completo...");
+                    
+                    //CHAMA O CLIENTE
+                    Map<String, Object> resultadoHistorico = cliente.gerarHistoricoCompleto(alunoId);
+                    
+                    if ("success".equals(resultadoHistorico.get("status"))) {
+                        @SuppressWarnings("unchecked")
+                        List<Map<String, Object>> historico = (List<Map<String, Object>>) resultadoHistorico.get("historico");
+                        
                         if (historico.isEmpty()) {
                             System.out.println("Nenhum registro encontrado para o aluno ID " + alunoId);
                         } else {
                             System.out.println("Histórico do aluno ID " + alunoId + ":");
-                            for (Map.Entry<Disciplina, Double> entry : historico.entrySet()) {
-                                System.out.println("Disciplina: " + entry.getKey().getNome() + " | Nota: " + entry.getValue());
+                            for (Map<String, Object> entrada : historico) {
+                                System.out.println("Disciplina: " + entrada.get("disciplinaNome") + " | Nota: " + entrada.get("nota"));
                             }
                         }
-
-                        break;
-                    case 2:
-                        System.out.println("Listando disciplinas aprovadas...");
-
-                        // Chamando o método para listar disciplinas aprovadas
-                        Map<Disciplina, Double> disciplinasAprovadas = historicoService.listarDisciplinasAprovadas(alunoId);
-
-                        // Exibindo disciplinas aprovadas do aluno
-                        if (disciplinasAprovadas.isEmpty()) {
-                            System.out.println("Nenhuma disciplina aprovada encontrada para o aluno ID " + alunoId);
-                        } else {
-                            System.out.println("Disciplinas aprovadas do aluno ID " + alunoId + ":");
-                            for (Map.Entry<Disciplina, Double> entry : disciplinasAprovadas.entrySet()) {
-                                System.out.println("Disciplina: " + entry.getKey().getNome() + " | Nota: " + entry.getValue());
-                            }
-                        }
-
-                        break;
-                    case 3:
-                        System.out.println("Listando disciplinas reprovadas...");
-
-                        // Chamando o método para listar disciplinas reprovadas
-                        Map<Disciplina, Double> disciplinasReprovadas = historicoService.listarDisciplinasReprovadas(alunoId);
-
-                        // Exibindo disciplinas reprovadas do aluno
-                        if (disciplinasReprovadas.isEmpty()) {
-                            System.out.println("Nenhuma disciplina reprovada encontrada para o aluno ID " + alunoId);
-                        } else {
-                            System.out.println("Disciplinas reprovadas do aluno ID " + alunoId + ":");
-                            for (Map.Entry<Disciplina, Double> entry : disciplinasReprovadas.entrySet()) {
-                                System.out.println("Disciplina: " + entry.getKey().getNome() + " | Nota: " + entry.getValue());
-                            }
-                        }
-
-                        break;
-                    case 4:
-                        System.out.println("Listando disciplinas em curso...");
-
-                        // Chamando o método para listar disciplinas em curso
-                        List<Disciplina> disciplinasEmCurso = historicoService.listarDisciplinasEmCurso(alunoId);
-
-                        // Exibindo disciplinas em curso do aluno
-                        if (disciplinasEmCurso.isEmpty()) {
+                    } else {
+                        System.out.println("Erro ao gerar histórico: " + resultadoHistorico.get("message"));
+                    }
+                    break;
+                    
+                case 2:
+                    System.out.println("Listando disciplinas aprovadas...");
+                    
+                    Map<String, Object> resultadoAprovadas = chamarServicoHistorico("aprovadas", alunoId);
+                    processarResultadoDisciplinas(resultadoAprovadas, "aprovadas", alunoId);
+                    break;
+                    
+                case 3:
+                    System.out.println("Listando disciplinas reprovadas...");
+                    
+                    Map<String, Object> resultadoReprovadas = chamarServicoHistorico("reprovadas", alunoId);
+                    processarResultadoDisciplinas(resultadoReprovadas, "reprovadas", alunoId);
+                    break;
+                    
+                case 4:
+                    System.out.println("Listando disciplinas em curso...");
+                    
+                    Map<String, Object> resultadoEmCurso = chamarServicoHistorico("emCurso", alunoId);
+                    
+                    if ("success".equals(resultadoEmCurso.get("status"))) {
+                        @SuppressWarnings("unchecked")
+                        List<Map<String, Object>> disciplinas = (List<Map<String, Object>>) resultadoEmCurso.get("disciplinas");
+                        
+                        if (disciplinas.isEmpty()) {
                             System.out.println("Nenhuma disciplina em curso encontrada para o aluno ID " + alunoId);
                         } else {
                             System.out.println("Disciplinas em curso do aluno ID " + alunoId + ":");
-                            for (Disciplina disciplina : disciplinasEmCurso) {
-                                System.out.println("Disciplina: " + disciplina.getNome());
+                            for (Map<String, Object> disciplina : disciplinas) {
+                                System.out.println("Disciplina: " + disciplina.get("nome"));
                             }
                         }
-
-                        break;
-                    case 5:
-                        System.out.println("Calculando coeficiente de rendimento...");
-
-                        // Chamando o método para calcular o coeficiente de rendimento
-                        Double coeficienteRendimento = historicoService.calcularCoeficienteRendimento(alunoId);
-
-                        // Exibindo resultado ao usuário
-                        if (coeficienteRendimento != null) {
-                            System.out.println("Coeficiente de rendimento do aluno ID " + alunoId + ": " + coeficienteRendimento);
+                    } else {
+                        System.out.println("Erro ao listar disciplinas em curso: " + resultadoEmCurso.get("message"));
+                    }
+                    break;
+                    
+                case 5:
+                    System.out.println("Calculando coeficiente de rendimento...");
+                    
+                    Map<String, Object> resultadoCoeficiente = chamarServicoHistorico("coeficiente", alunoId);
+                    
+                    if ("success".equals(resultadoCoeficiente.get("status"))) {
+                        Double coeficiente = (Double) resultadoCoeficiente.get("coeficiente");
+                        if (coeficiente != null) {
+                            System.out.println("Coeficiente de rendimento do aluno ID " + alunoId + ": " + coeficiente);
                         } else {
-                            System.out.println("Não foi possível calcular o coeficiente de rendimento para o aluno ID " + alunoId);
+                            System.out.println("Não foi possível calcular o coeficiente de rendimento");
                         }
+                    } else {
+                        System.out.println("Erro ao calcular coeficiente: " + resultadoCoeficiente.get("message"));
+                    }
+                    break;
+                    
+                default:
+                    System.out.println("Opção inválida, tente novamente.");
+                    break;
+            }
 
-                            break;
-                        case 0:
-                            System.out.println("Voltando...");
-                            break;
-                        default:
-                            System.out.println("Opção inválida, tente novamente.");
-
-                        break;
-                }
+        } while (escolhaDoSubservico != 0);
+    }
     
-            } while (escolhaDoSubservico != 0);
-            
+    //MÉTODOS AUXILIARES para chamar serviços específicos
+    private static Map<String, Object> chamarServicoMatricula(String acao, Integer alunoId, Integer disciplinaId, Object extra) {
+        try {
+            return cliente.callService("matricula", criarRequest(acao, alunoId, disciplinaId, extra));
         } catch (Exception e) {
-            // TODO: handle exception
+            System.err.println("Erro ao chamar serviço de matrícula: " + e.getMessage());
+            Map<String, Object> errorResponse = Map.of(
+                "status", "error",
+                "message", "Erro de comunicação: " + e.getMessage()
+            );
+            return errorResponse;
         }
-
-
-        
+    }
+    
+    private static Map<String, Object> chamarServicoNota(String acao, Integer alunoId, Integer disciplinaId, Object extra) {
+        try {
+            return cliente.callService("nota", criarRequest(acao, alunoId, disciplinaId, extra));
+        } catch (Exception e) {
+            System.err.println("Erro ao chamar serviço de nota: " + e.getMessage());
+            Map<String, Object> errorResponse = Map.of(
+                "status", "error",
+                "message", "Erro de comunicação: " + e.getMessage()
+            );
+            return errorResponse;
+        }
+    }
+    
+    private static Map<String, Object> chamarServicoHistorico(String acao, Integer alunoId) {
+        try {
+            return cliente.callService("historico", criarRequest(acao, alunoId, null, null));
+        } catch (Exception e) {
+            System.err.println("Erro ao chamar serviço de histórico: " + e.getMessage());
+            Map<String, Object> errorResponse = Map.of(
+                "status", "error",
+                "message", "Erro de comunicação: " + e.getMessage()
+            );
+            return errorResponse;
+        }
+    }
+    
+    private static Map<String, Object> criarRequest(String acao, Integer alunoId, Integer disciplinaId, Object extra) {
+        Map<String, Object> request = new java.util.HashMap<>();
+        request.put("action", acao);
+        if (alunoId != null) request.put("alunoId", alunoId);
+        if (disciplinaId != null) request.put("disciplinaId", disciplinaId);
+        if (extra != null) request.put("extra", extra);
+        return request;
+    }
+    
+    private static void processarResultadoDisciplinas(Map<String, Object> resultado, String tipo, int alunoId) {
+        if ("success".equals(resultado.get("status"))) {
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> disciplinas = (List<Map<String, Object>>) resultado.get("disciplinas");
+            
+            if (disciplinas.isEmpty()) {
+                System.out.println("Nenhuma disciplina " + tipo + " encontrada para o aluno ID " + alunoId);
+            } else {
+                System.out.println("Disciplinas " + tipo + " do aluno ID " + alunoId + ":");
+                for (Map<String, Object> entrada : disciplinas) {
+                    System.out.println("Disciplina: " + entrada.get("disciplinaNome") + " | Nota: " + entrada.get("nota"));
+                }
+            }
+        } else {
+            System.out.println("Erro ao listar disciplinas " + tipo + ": " + resultado.get("message"));
+        }
     }
 }
-

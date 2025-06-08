@@ -25,6 +25,7 @@ public class TestMainClient {
         this.gatewayHost = gatewayHost; // ISSO AQUI É O UNICO IP DA APLICAÇÃO BASICAMENTE, é setado nas mains dos serviços
         this.gatewayPort = gatewayPort;
     }    @SuppressWarnings("unchecked") // é so pra nao aparecer o erro do cast de objeto para map ali no retorno
+    
     private Map<String, Object> sendToGatewayUDP(Map<String, Object> requestPayload) throws IOException, ClassNotFoundException {
         try (Connection connection = new Connection()) {
             connection.setSoTimeout(UDP_TIMEOUT_MS);
@@ -39,7 +40,8 @@ public class TestMainClient {
             return (Map<String, Object>) SerializationUtils.deserialize(actualData);
         }
     }
-      private ServiceLocation discoverService(String serviceName) throws IOException, ClassNotFoundException {
+      
+    private ServiceLocation discoverService(String serviceName) throws IOException, ClassNotFoundException {
         ServiceLocation cachedLocation = serviceCache.get(serviceName);
         if (cachedLocation != null) {
             // disponibilidae dele aqui
@@ -144,11 +146,13 @@ public class TestMainClient {
     // ESSAS FUNCOES AQUI SÃO EXEMPLOS DE COMO CHAMAR OS SERVIÇOS, A GENTE PODE MUDAR DEPOIS
     // MAS O IMPORTANTE É QUE ELAS CHAMAM O GATEWAY E RETORNAM O RESULTADO
     // E MOSTRAM AS CARACTERISISTICAS DE SD
+
+        //Em relação a matrícula
     public Map<String, Object> matricularAluno(int alunoId, int disciplinaId) {
         Map<String, Object> request = new HashMap<>();
         request.put("action", "matricular");
         request.put("alunoId", alunoId);
-        request.put("disciplinaId", disciplinaId);
+        request.put("disciplinaId", disciplinaId); 
         
         try {
             return callService(MATRICULA_SERVICE, request);
@@ -161,7 +165,78 @@ public class TestMainClient {
             return errorResponse;
         }
     }
+
+    public Map<String, Object> verificarMatricula(int alunoId, int disciplinaId) {
+        Map<String, Object> request = new HashMap<>();
+        request.put("action", "verificarMatricula");
+        request.put("alunoId", alunoId);
+        request.put("disciplinaId", disciplinaId);
+        
+        try {
+            return callService(MATRICULA_SERVICE, request);
+        } catch (Exception e) {
+            System.err.println("Erro ao verificar matrícula: " + e.getMessage());
+            e.printStackTrace();
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("status", "error");
+            errorResponse.put("message", "Erro de comunicação: " + e.getMessage());
+            return errorResponse;
+        }
+    }
+
+    public Map<String, Object> listarMatriculasPorAluno(int alunoId) {
+        Map<String, Object> request = new HashMap<>();
+        request.put("action", "buscarPorAluno");
+        request.put("alunoId", alunoId);
+        
+        try {
+            return callService(MATRICULA_SERVICE, request);
+        } catch (Exception e) {
+            System.err.println("Erro ao listar matrículas por aluno: " + e.getMessage());
+            e.printStackTrace();
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("status", "error");
+            errorResponse.put("message", "Erro de comunicação: " + e.getMessage());
+            return errorResponse;
+        }
+    }
+
+    public Map<String, Object> listarMatriculasPorDisciplina(int disciplinaId) {
+        Map<String, Object> request = new HashMap<>();
+        request.put("action", "buscarPorDisciplina");
+        request.put("disciplinaId", disciplinaId);
+        
+        try {
+            return callService(MATRICULA_SERVICE, request);
+        } catch (Exception e) {
+            System.err.println("Erro ao listar matrículas por disciplina: " + e.getMessage());
+            e.printStackTrace();
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("status", "error");
+            errorResponse.put("message", "Erro de comunicação: " + e.getMessage());
+            return errorResponse;
+        }
+    }
+
+    public Map<String, Object> cancelarMatricula(int alunoId, int disciplinaId) {
+        Map<String, Object> request = new HashMap<>();
+        request.put("action", "cancelar");
+        request.put("alunoId", alunoId);
+        request.put("disciplinaId", disciplinaId);
+        
+        try {
+            return callService(MATRICULA_SERVICE, request);
+        } catch (Exception e) {
+            System.err.println("Erro ao cancelar matrícula: " + e.getMessage());
+            e.printStackTrace();
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("status", "error");
+            errorResponse.put("message", "Erro de comunicação: " + e.getMessage());
+            return errorResponse;
+        }
+    }
     
+        //Em relação a nota
     public Map<String, Object> registrarNota(int alunoId, int disciplinaId, Double nota) {
         Map<String, Object> request = new HashMap<>();
         request.put("action", "registrarNota");
@@ -180,7 +255,60 @@ public class TestMainClient {
             return errorResponse;
         }
     }
+
+    public Map<String, Object> consultarNota(int alunoId, int disciplinaId) {
+        Map<String, Object> request = new HashMap<>();
+        request.put("action", "consultarNota");
+        request.put("alunoId", alunoId);
+        request.put("disciplinaId", disciplinaId);
+        
+        try {
+            return callService(NOTA_SERVICE, request);
+        } catch (Exception e) {
+            System.err.println("Erro ao consultar nota: " + e.getMessage());
+            e.printStackTrace();
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("status", "error");
+            errorResponse.put("message", "Erro de comunicação: " + e.getMessage());
+            return errorResponse;
+        }
+    }
+
+    public Map<String, Object> calcularMediaAluno(int alunoId) {
+        Map<String, Object> request = new HashMap<>();
+        request.put("action", "calcularMediaAluno");
+        request.put("alunoId", alunoId);
+        
+        try {
+            return callService(NOTA_SERVICE, request);
+        } catch (Exception e) {
+            System.err.println("Erro ao calcular média do aluno: " + e.getMessage());
+            e.printStackTrace();
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("status", "error");
+            errorResponse.put("message", "Erro de comunicação: " + e.getMessage());
+            return errorResponse;
+        }
+    }
+
+    public Map<String, Object> calcularMediaDisciplina(int disciplinaId) {
+        Map<String, Object> request = new HashMap<>();
+        request.put("action", "calcularMediaDisciplina");
+        request.put("disciplinaId", disciplinaId);
+        
+        try {
+            return callService(NOTA_SERVICE, request);
+        } catch (Exception e) {
+            System.err.println("Erro ao calcular média da disciplina: " + e.getMessage());
+            e.printStackTrace();
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("status", "error");
+            errorResponse.put("message", "Erro de comunicação: " + e.getMessage());
+            return errorResponse;
+        }
+    }
     
+        //Em relação a histórico
     public Map<String, Object> gerarHistoricoCompleto(int alunoId) {
         Map<String, Object> request = new HashMap<>();
         request.put("action", "historicoCompleto");
@@ -198,6 +326,73 @@ public class TestMainClient {
         }
     }
     
+    public Map<String, Object> listarDisciplinasAprovadas(int alunoId) {
+        Map<String, Object> request = new HashMap<>();
+        request.put("action", "disciplinasAprovadas");
+        request.put("alunoId", alunoId);
+        
+        try {
+            return callService(HISTORICO_SERVICE, request);
+        } catch (Exception e) {
+            System.err.println("Erro ao listar disciplinas aprovadas: " + e.getMessage());
+            e.printStackTrace();
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("status", "error");
+            errorResponse.put("message", "Erro de comunicação: " + e.getMessage());
+            return errorResponse;
+        }
+    }
+
+    public Map<String, Object> listarDisciplinasReprovadas(int alunoId) {
+        Map<String, Object> request = new HashMap<>();
+        request.put("action", "disciplinasReprovadas");
+        request.put("alunoId", alunoId);
+        
+        try {
+            return callService(HISTORICO_SERVICE, request);
+        } catch (Exception e) {
+            System.err.println("Erro ao listar disciplinas reprovadas: " + e.getMessage());
+            e.printStackTrace();
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("status", "error");
+            errorResponse.put("message", "Erro de comunicação: " + e.getMessage());
+            return errorResponse;
+        }
+    }
+
+    public Map<String, Object> listarDisciplinasEmCurso(int alunoId) {
+        Map<String, Object> request = new HashMap<>();
+        request.put("action", "disciplinasEmCurso");
+        request.put("alunoId", alunoId);
+        
+        try {
+            return callService(HISTORICO_SERVICE, request);
+        } catch (Exception e) {
+            System.err.println("Erro ao listar disciplinas em curso: " + e.getMessage());
+            e.printStackTrace();
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("status", "error");
+            errorResponse.put("message", "Erro de comunicação: " + e.getMessage());
+            return errorResponse;
+        }
+    }
+
+    public Map<String, Object> calcularCoeficienteRendimento(int alunoId) {
+        Map<String, Object> request = new HashMap<>();
+        request.put("action", "calcularCR");
+        request.put("alunoId", alunoId);
+        
+        try {
+            return callService(HISTORICO_SERVICE, request);
+        } catch (Exception e) {
+            System.err.println("Erro ao calcular coeficiente de rendimento: " + e.getMessage());
+            e.printStackTrace();
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("status", "error");
+            errorResponse.put("message", "Erro de comunicação: " + e.getMessage());
+            return errorResponse;
+        }
+    }
 
      // Só rodar para testar o cliente
     public static void main(String[] args) {
