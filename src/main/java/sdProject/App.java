@@ -1,13 +1,10 @@
 package sdProject;
 
-import java.sql.SQLException;
 import java.util.List;
 import java.util.Map;
 import java.util.Scanner;
 
 import sdProject.config.DatabaseConnection;
-import sdProject.models.Disciplina;
-import sdProject.models.Matricula;
 import sdProject.network.client.TestMainClient;
 
 public class App {
@@ -90,6 +87,7 @@ public class App {
             "2.Verificar matrícula \n" +
             "3.Listar matrículas por aluno \n" +
             "4.Listar matrículas por disciplina \n" +
+            "5.Cancelar matrícula \n" +
             "0.Voltar");
 
             escolhaDoSubservico = scanner.nextInt();
@@ -108,7 +106,7 @@ public class App {
                 case 1:
                     System.out.println("Matriculando aluno " + alunoId + " na disciplina " + disciplinaId);
                     
-                    //CHAMA O CLIENTE DISTRIBUÍDO
+                    //CHAMA O CLIENTE 
                     Map<String, Object> resultadoMatricula = cliente.matricularAluno(alunoId, disciplinaId);
                     
                     if ("success".equals(resultadoMatricula.get("status"))) {
@@ -122,8 +120,8 @@ public class App {
                 case 2:
                     System.out.println("Verificando matrícula do aluno " + alunoId + " na disciplina " + disciplinaId);
                     
-                    //Criar nova operação para verificar matrícula
-                    Map<String, Object> resultadoVerificar = chamarServicoMatricula("verificar", alunoId, disciplinaId, null);
+                    //CHAMA O CLIENTE
+                    Map<String, Object> resultadoVerificar = cliente.verificarMatricula(alunoId, disciplinaId);
                     
                     if ("success".equals(resultadoVerificar.get("status"))) {
                         boolean matriculado = (Boolean) resultadoVerificar.get("matriculado");
@@ -136,8 +134,8 @@ public class App {
                 case 3:
                     System.out.println("Listando matrículas do aluno " + alunoId);
                     
-                    //Criar nova operação para listar por aluno
-                    Map<String, Object> resultadoListarAluno = chamarServicoMatricula("listarPorAluno", alunoId, null, null);
+                    //CHAMA O CLIENTE
+                    Map<String, Object> resultadoListarAluno = cliente.listarMatriculasPorAluno(alunoId);
                     
                     if ("success".equals(resultadoListarAluno.get("status"))) {
                         @SuppressWarnings("unchecked")
@@ -158,8 +156,8 @@ public class App {
                 case 4:
                     System.out.println("Listando matrículas da disciplina " + disciplinaId);
                     
-                    //Criar nova operação para listar por disciplina
-                    Map<String, Object> resultadoListarDisciplina = chamarServicoMatricula("listarPorDisciplina", null, disciplinaId, null);
+                    //CHAMA O CLIENTE
+                    Map<String, Object> resultadoListarDisciplina = cliente.listarMatriculasPorDisciplina(disciplinaId);
                     
                     if ("success".equals(resultadoListarDisciplina.get("status"))) {
                         @SuppressWarnings("unchecked")
@@ -175,6 +173,20 @@ public class App {
                         }
                     } else {
                         System.out.println("Erro ao listar: " + resultadoListarDisciplina.get("message"));
+                    }
+                    break;
+                    
+                case 5:
+                    System.out.println("Cancelando matrícula do aluno " + alunoId + " na disciplina " + disciplinaId);
+                    
+                    //CHAMA O CLIENTE
+                    Map<String, Object> resultadoCancelar = cliente.cancelarMatricula(alunoId, disciplinaId);
+                    
+                    if ("success".equals(resultadoCancelar.get("status"))) {
+                        System.out.println("Matrícula cancelada com sucesso!");
+                        System.out.println("Mensagem: " + resultadoCancelar.get("message"));
+                    } else {
+                        System.out.println("Erro ao cancelar matrícula: " + resultadoCancelar.get("message"));
                     }
                     break;
                     
@@ -227,7 +239,8 @@ public class App {
                 case 2:
                     System.out.println("Consultando nota...");
                     
-                    Map<String, Object> resultadoConsulta = chamarServicoNota("consultar", alunoId, disciplinaId, null);
+                    //CHAMA O CLIENTE
+                    Map<String, Object> resultadoConsulta = cliente.consultarNota(alunoId, disciplinaId);
                     
                     if ("success".equals(resultadoConsulta.get("status"))) {
                         Double notaConsultada = (Double) resultadoConsulta.get("nota");
@@ -244,7 +257,8 @@ public class App {
                 case 3:
                     System.out.println("Calculando média do aluno...");
                     
-                    Map<String, Object> resultadoMediaAluno = chamarServicoNota("mediaAluno", alunoId, null, null);
+                    //CHAMA O CLIENTE
+                    Map<String, Object> resultadoMediaAluno = cliente.calcularMediaAluno(alunoId);
                     
                     if ("success".equals(resultadoMediaAluno.get("status"))) {
                         Double media = (Double) resultadoMediaAluno.get("media");
@@ -261,7 +275,8 @@ public class App {
                 case 4:
                     System.out.println("Calculando média da disciplina...");
                     
-                    Map<String, Object> resultadoMediaDisciplina = chamarServicoNota("mediaDisciplina", null, disciplinaId, null);
+                    //CHAMA O CLIENTE
+                    Map<String, Object> resultadoMediaDisciplina = cliente.calcularMediaDisciplina(disciplinaId);
                     
                     if ("success".equals(resultadoMediaDisciplina.get("status"))) {
                         Double media = (Double) resultadoMediaDisciplina.get("media");
@@ -333,21 +348,24 @@ public class App {
                 case 2:
                     System.out.println("Listando disciplinas aprovadas...");
                     
-                    Map<String, Object> resultadoAprovadas = chamarServicoHistorico("aprovadas", alunoId);
+                    //CHAMA O CLIENTE
+                    Map<String, Object> resultadoAprovadas = cliente.listarDisciplinasAprovadas(alunoId);
                     processarResultadoDisciplinas(resultadoAprovadas, "aprovadas", alunoId);
                     break;
                     
                 case 3:
                     System.out.println("Listando disciplinas reprovadas...");
                     
-                    Map<String, Object> resultadoReprovadas = chamarServicoHistorico("reprovadas", alunoId);
+                    //CHAMA O CLIENTE
+                    Map<String, Object> resultadoReprovadas = cliente.listarDisciplinasReprovadas(alunoId);
                     processarResultadoDisciplinas(resultadoReprovadas, "reprovadas", alunoId);
                     break;
                     
                 case 4:
                     System.out.println("Listando disciplinas em curso...");
                     
-                    Map<String, Object> resultadoEmCurso = chamarServicoHistorico("emCurso", alunoId);
+                    //CHAMA O CLIENTE
+                    Map<String, Object> resultadoEmCurso = cliente.listarDisciplinasEmCurso(alunoId);
                     
                     if ("success".equals(resultadoEmCurso.get("status"))) {
                         @SuppressWarnings("unchecked")
@@ -369,7 +387,8 @@ public class App {
                 case 5:
                     System.out.println("Calculando coeficiente de rendimento...");
                     
-                    Map<String, Object> resultadoCoeficiente = chamarServicoHistorico("coeficiente", alunoId);
+                    //CHAMA O CLIENTE
+                    Map<String, Object> resultadoCoeficiente = cliente.calcularCoeficienteRendimento(alunoId);
                     
                     if ("success".equals(resultadoCoeficiente.get("status"))) {
                         Double coeficiente = (Double) resultadoCoeficiente.get("coeficiente");
@@ -391,55 +410,7 @@ public class App {
         } while (escolhaDoSubservico != 0);
     }
     
-    //MÉTODOS AUXILIARES para chamar serviços específicos
-    private static Map<String, Object> chamarServicoMatricula(String acao, Integer alunoId, Integer disciplinaId, Object extra) {
-        try {
-            return cliente.callService("matricula", criarRequest(acao, alunoId, disciplinaId, extra));
-        } catch (Exception e) {
-            System.err.println("Erro ao chamar serviço de matrícula: " + e.getMessage());
-            Map<String, Object> errorResponse = Map.of(
-                "status", "error",
-                "message", "Erro de comunicação: " + e.getMessage()
-            );
-            return errorResponse;
-        }
-    }
-    
-    private static Map<String, Object> chamarServicoNota(String acao, Integer alunoId, Integer disciplinaId, Object extra) {
-        try {
-            return cliente.callService("nota", criarRequest(acao, alunoId, disciplinaId, extra));
-        } catch (Exception e) {
-            System.err.println("Erro ao chamar serviço de nota: " + e.getMessage());
-            Map<String, Object> errorResponse = Map.of(
-                "status", "error",
-                "message", "Erro de comunicação: " + e.getMessage()
-            );
-            return errorResponse;
-        }
-    }
-    
-    private static Map<String, Object> chamarServicoHistorico(String acao, Integer alunoId) {
-        try {
-            return cliente.callService("historico", criarRequest(acao, alunoId, null, null));
-        } catch (Exception e) {
-            System.err.println("Erro ao chamar serviço de histórico: " + e.getMessage());
-            Map<String, Object> errorResponse = Map.of(
-                "status", "error",
-                "message", "Erro de comunicação: " + e.getMessage()
-            );
-            return errorResponse;
-        }
-    }
-    
-    private static Map<String, Object> criarRequest(String acao, Integer alunoId, Integer disciplinaId, Object extra) {
-        Map<String, Object> request = new java.util.HashMap<>();
-        request.put("action", acao);
-        if (alunoId != null) request.put("alunoId", alunoId);
-        if (disciplinaId != null) request.put("disciplinaId", disciplinaId);
-        if (extra != null) request.put("extra", extra);
-        return request;
-    }
-    
+    // MÉTODO AUXILIAR para processar resultados de disciplinas
     private static void processarResultadoDisciplinas(Map<String, Object> resultado, String tipo, int alunoId) {
         if ("success".equals(resultado.get("status"))) {
             @SuppressWarnings("unchecked")
