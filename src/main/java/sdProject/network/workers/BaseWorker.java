@@ -55,7 +55,7 @@ public abstract class BaseWorker {
             serverSocket = new ServerSocket(port);
             running = true;
             System.out.println(workerName + " iniciado na porta " + port);
-            
+            //responsável por lidar com as requisições que chegam, permitindo que o worker processe vários pedidos simultaneamente.
             new Thread(() -> acceptConnections()).start();
             
             registerWithDiscoveryGatewayUDP();
@@ -181,6 +181,13 @@ public abstract class BaseWorker {
         return response;
     }
 
+    protected Map<String, Object> createErrorResponse(String message) {
+        Map<String, Object> response = new HashMap<>();
+        response.put("status", "error");
+        response.put("message", message);
+        return response;
+    }
+
     // Esse aí para o worker
     public void stop() {
         running = false;
@@ -197,10 +204,5 @@ public abstract class BaseWorker {
         }
     }
     
-    protected Map<String, Object> createErrorResponse(String message) {
-        Map<String, Object> response = new HashMap<>();
-        response.put("status", "error");
-        response.put("message", message);
-        return response;
-    }
+    
 }

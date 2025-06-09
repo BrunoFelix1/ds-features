@@ -28,6 +28,7 @@ public class DatabaseConnection {    private static Connection connection = null
         System.out.println("Migrações aplicadas com sucesso!");
     }
 
+    //Fecha conexão
     public static void closeConnection() {
         if (connection != null) {
             try {
