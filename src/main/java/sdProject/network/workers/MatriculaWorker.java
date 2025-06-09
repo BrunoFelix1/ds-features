@@ -1,5 +1,6 @@
 package sdProject.network.workers;
 
+import sdProject.config.AppConfig;
 import sdProject.controllers.MatriculaController;
 import java.sql.SQLException;
 import java.util.Map;
@@ -104,15 +105,13 @@ public class MatriculaWorker extends BaseWorker {
         }
         
         return matriculaController.verificarMatricula(alunoId, disciplinaId);
-    }
-
-    public static void main(String[] args) {
+    }    public static void main(String[] args) {
         try {
-            int port = 8081; // Porta padrão
-            String gatewayHost = "localhost";
-            int gatewayPort = 8080;
+            int port = AppConfig.getMatriculaWorkerPort(); // Porta padrão da configuração
+            String gatewayHost = AppConfig.getGatewayHost();
+            int gatewayPort = AppConfig.getGatewayPort();
             
-            // Processar argumentos da linha de comando
+            // Processar argumentos da linha de comando (sobrescreve as configurações)
             if (args.length > 0) {
                 port = Integer.parseInt(args[0]);
             }

@@ -2,6 +2,7 @@ package sdProject.network.workers.monitor;
 
 import sdProject.network.util.SerializationUtils;
 import sdProject.network.util.Connection;
+import sdProject.config.AppConfig;
 
 import java.io.IOException;
 import java.net.*;
@@ -21,7 +22,7 @@ public class WorkerMonitor {
     private final Map<String, WorkerInfo> workerConfigs;
     private final Map<String, Process> activeProcesses;
 
-    private static final int UDP_TIMEOUT_MS = 5000;
+    private static final int UDP_TIMEOUT_MS = AppConfig.getUdpTimeoutMs();
     
 
     
@@ -34,15 +35,16 @@ public class WorkerMonitor {
         
         registerWorkerTypes();
     }
-    
-    private void registerWorkerTypes() {
-        workerConfigs.put("nota", new WorkerInfo("nota", "sdProject.network.workers.NotaWorker", 8082));
-        workerConfigs.put("matricula", new WorkerInfo("matricula", "sdProject.network.workers.MatriculaWorker", 8081));
-        workerConfigs.put("historico", new WorkerInfo("historico", "sdProject.network.workers.HistoricoWorker", 8083));
+      private void registerWorkerTypes() {
+        workerConfigs.put("nota", new WorkerInfo("nota", "sdProject.network.workers.NotaWorker", AppConfig.getNotaWorkerPort()));
+        workerConfigs.put("matricula", new WorkerInfo("matricula", "sdProject.network.workers.MatriculaWorker", AppConfig.getMatriculaWorkerPort()));
+        workerConfigs.put("historico", new WorkerInfo("historico", "sdProject.network.workers.HistoricoWorker", AppConfig.getHistoricoWorkerPort()));
     }
-    
-    public void start() {
-        scheduler.scheduleAtFixedRate(this::checkWorkersHealth, 10, 30, TimeUnit.SECONDS);
+      public void start() {
+        scheduler.scheduleAtFixedRate(this::checkWorkersHealth, 
+            AppConfig.getHealthCheckIntervalSeconds(), 
+            AppConfig.getHealthCheckIntervalSeconds() * 3, 
+            TimeUnit.SECONDS);
         
         System.out.println("WorkerMonitor iniciado. Monitorando workers...");
     }
@@ -235,10 +237,9 @@ public class WorkerMonitor {
 
         System.out.println("WorkerMonitor parado");
     }
-    
-    public static void main(String[] args) {
-        String gatewayHost = "localhost";
-        int gatewayPort = 8080;
+      public static void main(String[] args) {
+        String gatewayHost = AppConfig.getGatewayHost();
+        int gatewayPort = AppConfig.getGatewayPort();
         
         // Verificar se host e porta foram passados como argumentos
         if (args.length >= 2) {

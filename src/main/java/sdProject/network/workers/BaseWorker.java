@@ -1,5 +1,6 @@
 package sdProject.network.workers;
 
+import sdProject.config.AppConfig;
 import sdProject.network.util.Connection;
 import sdProject.network.util.SerializationUtils;
 
@@ -21,11 +22,10 @@ public abstract class BaseWorker {
     protected ServerSocket serverSocket;
     protected final ExecutorService threadPool;
     protected final ScheduledExecutorService heartbeatScheduler;
-    
-    private final String gatewayHost;
+      private final String gatewayHost;
     private final int gatewayPort;
 
-    private static final int UDP_TIMEOUT_MS = 5000; // Tempo para respostas do gateway
+    private static final int UDP_TIMEOUT_MS = AppConfig.getUdpTimeoutMs();
     
     public BaseWorker(int port, String workerName, String serviceId, int threadPoolSize, 
                      String gatewayHost, int gatewayPort) {
@@ -46,7 +46,7 @@ public abstract class BaseWorker {
     }
     
     public BaseWorker(int port, String workerName, String serviceId, int threadPoolSize) {
-        this(port, workerName, serviceId, threadPoolSize, "localhost", 8080);
+        this(port, workerName, serviceId, threadPoolSize, AppConfig.getGatewayHost(), AppConfig.getGatewayPort());
     }
     
 
@@ -59,9 +59,11 @@ public abstract class BaseWorker {
             new Thread(() -> acceptConnections()).start();
             
             registerWithDiscoveryGatewayUDP();
-            
-            // Inicia envio periódico de heartbeats (a cada 10 segundos)
-            heartbeatScheduler.scheduleAtFixedRate(this::sendHeartbeatUDP, 10, 10, TimeUnit.SECONDS);
+              // Inicia envio periódico de heartbeats (a cada X segundos conforme configuração)
+            heartbeatScheduler.scheduleAtFixedRate(this::sendHeartbeatUDP, 
+                AppConfig.getHeartbeatIntervalSeconds(), 
+                AppConfig.getHeartbeatIntervalSeconds(), 
+                TimeUnit.SECONDS);
             
         } catch (IOException e) {
             System.err.println("Erro ao iniciar " + workerName + ": " + e.getMessage());

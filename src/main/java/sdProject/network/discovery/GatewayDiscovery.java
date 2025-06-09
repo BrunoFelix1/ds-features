@@ -2,6 +2,7 @@ package sdProject.network.discovery;
 
 import sdProject.network.util.Connection;
 import sdProject.network.util.SerializationUtils;
+import sdProject.config.AppConfig;
 
 import java.io.IOException;
 import java.net.*;
@@ -21,11 +22,9 @@ public class GatewayDiscovery {
     private Connection connection;
     private final ExecutorService threadPool;
     private final ScheduledExecutorService healthChecker;
-
-    
-    public GatewayDiscovery(int port, int threadPoolSize) {
+    public GatewayDiscovery(int port) {
         this.port = port;
-        this.threadPool = Executors.newFixedThreadPool(threadPoolSize);
+        this.threadPool = Executors.newFixedThreadPool(AppConfig.getGatewayThreadPoolSize());
         this.healthChecker = Executors.newScheduledThreadPool(1);
     }
       public void start() {
@@ -36,9 +35,11 @@ public class GatewayDiscovery {
 
             // Inicia a thread para receber pacotes UDP
             new Thread(this::receivePackets).start();
-            
-            // Inicia verificação periódica da saúde dos serviços
-            healthChecker.scheduleAtFixedRate(this::checkServiceHealth, 10, 10, TimeUnit.SECONDS);
+              // Inicia verificação periódica da saúde dos serviços
+            healthChecker.scheduleAtFixedRate(this::checkServiceHealth, 
+                AppConfig.getHealthCheckIntervalSeconds(), 
+                AppConfig.getHealthCheckIntervalSeconds(), 
+                TimeUnit.SECONDS);
             
         } catch (IOException e) {
             System.err.println("Erro ao iniciar Gateway Discovery: " + e.getMessage());
@@ -254,17 +255,16 @@ public class GatewayDiscovery {
         healthChecker.shutdown();
         System.out.println("Gateway Discovery (UDP) parado");
     }
-    
-    public static void main(String[] args) {
+      public static void main(String[] args) {
         try {
-            int port = 8080; 
+            int port = AppConfig.getGatewayPort(); 
             
             // Verificar se a porta foi passada como argumento
             if (args.length > 0) {
                 port = Integer.parseInt(args[0]);
             }
             
-            GatewayDiscovery gateway = new GatewayDiscovery(port, 10);
+            GatewayDiscovery gateway = new GatewayDiscovery(port);
             gateway.start();
             
             // Adiciona shutdown hook para parar o gateway quando o JVM for encerrado

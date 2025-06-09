@@ -1,5 +1,6 @@
 package sdProject.network.client;
 
+import sdProject.config.AppConfig;
 import sdProject.network.util.Connection;
 import sdProject.network.util.SerializationUtils;
 
@@ -15,16 +16,15 @@ public class TestMainClient {
     private static final String HISTORICO_SERVICE = "historico";
     
     private final String gatewayHost;
-    private final int gatewayPort;
-      // Cache de localização dos serviços (serviço -> endereço:porta)
+    private final int gatewayPort;      // Cache de localização dos serviços (serviço -> endereço:porta)
     private final Map<String, ServiceLocation> serviceCache = new ConcurrentHashMap<>();
     
-    private static final int UDP_TIMEOUT_MS = 5000;
+    private static final int UDP_TIMEOUT_MS = AppConfig.getUdpTimeoutMs();
 
     public TestMainClient(String gatewayHost, int gatewayPort) {
         this.gatewayHost = gatewayHost; // ISSO AQUI É O UNICO IP DA APLICAÇÃO BASICAMENTE, é setado nas mains dos serviços
         this.gatewayPort = gatewayPort;
-    }    @SuppressWarnings("unchecked") // é so pra nao aparecer o erro do cast de objeto para map ali no retorno
+    }@SuppressWarnings("unchecked") // é so pra nao aparecer o erro do cast de objeto para map ali no retorno
     private Map<String, Object> sendToGatewayUDP(Map<String, Object> requestPayload) throws IOException, ClassNotFoundException {
         try (Connection connection = new Connection()) {
             connection.setSoTimeout(UDP_TIMEOUT_MS);
@@ -197,16 +197,14 @@ public class TestMainClient {
             return errorResponse;
         }
     }
-    
-
-     // Só rodar para testar o cliente
+        // Só rodar para testar o cliente
     public static void main(String[] args) {
         // essa é a unica definicao de ip da aplicação basicamente, o resto
         // é tudo dinâmico, a partir do gateway discovery
-        String gatewayHost = "localhost";
-        int gatewayPort = 8080;
+        String gatewayHost = AppConfig.getGatewayHost();
+        int gatewayPort = AppConfig.getGatewayPort();
         
-        // Verificar se host e porta foram passados como argumentos
+        // Verificar se host e porta foram passados como argumentos (sobrescreve as configurações)
         if (args.length >= 2) {
             gatewayHost = args[0];
             gatewayPort = Integer.parseInt(args[1]);

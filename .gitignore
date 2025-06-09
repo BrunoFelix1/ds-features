@@ -13,7 +13,7 @@ target/
 
 #Env num geral
 application.properties
-
+.env
 
 
 

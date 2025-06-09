@@ -2,48 +2,26 @@ package sdProject.config;
 
 import org.flywaydb.core.Flyway;
 
-import java.io.IOException;
-import java.io.InputStream;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
-import java.util.Properties;
 
-public class DatabaseConnection {
-    private static final Properties properties = new Properties();
-    private static Connection connection = null;
-
-    static {
-        try (InputStream input = DatabaseConnection.class.getClassLoader().getResourceAsStream("application.properties")) {
-            if (input == null) {
-                System.out.println("Não foi possível encontrar o arquivo application.properties");
-                throw new RuntimeException("Arquivo de configuração não encontrado");
-            }
-            properties.load(input);
-        } catch (IOException e) {
-            throw new RuntimeException("Erro ao carregar configurações", e);
-        }
-    }
-
-    public static Connection getConnection() throws SQLException {
-        if (connection == null || connection.isClosed()) {
-            String url = properties.getProperty("db.url");
-            String username = properties.getProperty("db.username");
-            String password = properties.getProperty("db.password");
+public class DatabaseConnection {    private static Connection connection = null;    public static Connection getConnection() throws SQLException {        if (connection == null || connection.isClosed()) {
+            String url = AppConfig.getDbUrl();
+            String username = AppConfig.getDbUsername();
+            String password = AppConfig.getDbPassword();
 
             connection = DriverManager.getConnection(url, username, password);
         }
         return connection;
-    }
-
-    public static void runMigrations() {
-        String url = properties.getProperty("db.url");
-        String username = properties.getProperty("db.username");
-        String password = properties.getProperty("db.password");
+    }    public static void runMigrations() {
+        String url = AppConfig.getDbUrl();
+        String username = AppConfig.getDbUsername();
+        String password = AppConfig.getDbPassword();
 
         Flyway flyway = Flyway.configure()
                 .dataSource(url, username, password)
-                .locations("classpath:db/migrations")
+                .locations(AppConfig.getFlywayLocations())
                 .load();
 
         flyway.migrate();
