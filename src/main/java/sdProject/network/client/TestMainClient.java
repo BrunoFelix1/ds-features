@@ -422,6 +422,7 @@ public class TestMainClient {
             // Gerar histórico
             Map<String, Object> historicoResponse = client.gerarHistoricoCompleto(1);
             System.out.println("Resposta do histórico: " + historicoResponse);
+
             
         } catch (Exception e) {
             System.err.println("Erro ao testar cliente: " + e.getMessage());

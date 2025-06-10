@@ -13,8 +13,8 @@ public class App {
     public static void main(String[] args) {
 
         //Instancia o cliente, com o host e a porta do gateway com quem ele vai se comunicar
-        String gatewayHost = "localhost";
-        int gatewayPort = 8080;
+        String gatewayHost = "localhost"; 
+        int gatewayPort = 8080; 
         
         // Verificar se host e porta foram passados como argumentos
         if (args.length >= 2) {
