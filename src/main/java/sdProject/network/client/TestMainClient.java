@@ -412,7 +412,7 @@ public class TestMainClient {
         // Exemplo de uso do cliente abaixo, a gente modifica dps
         try {
             // Matricular aluno
-            Map<String, Object> matriculaResponse = client.matricularAluno(1, 1);
+            Map<String, Object> matriculaResponse = client.listarMatriculasPorAluno(1);
             System.out.println("Resposta da matrícula: " + matriculaResponse);
             
             // Registrar nota

@@ -11,7 +11,6 @@ public class Connection implements AutoCloseable {
     private final boolean isUDP;
     private static final int MAX_UDP_SIZE = 65507;
 
-    // Construtor para conexão TCP (Cliente)
     public Connection(String host, int port) throws IOException {
         this.tcpSocket = new Socket(host, port);
         this.udpSocket = null;
