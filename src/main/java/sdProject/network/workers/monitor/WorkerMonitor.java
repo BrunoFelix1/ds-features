@@ -11,36 +11,34 @@ import java.util.Map;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-import java.util.ArrayList;
 import java.util.List;
-
 
 public class WorkerMonitor {
     private final String gatewayHost;
     private final int gatewayPort;
     private final ScheduledExecutorService scheduler;
     private final Map<String, WorkerInfo> workerConfigs;
-    private final Map<String, Process> activeProcesses;
+    private final List<String> remoteAgents;
 
     private static final int UDP_TIMEOUT_MS = AppConfig.getUdpTimeoutMs();
-    
-
     
     public WorkerMonitor(String gatewayHost, int gatewayPort) {
         this.gatewayHost = gatewayHost;
         this.gatewayPort = gatewayPort;
         this.scheduler = Executors.newScheduledThreadPool(1);
         this.workerConfigs = new HashMap<>();
-        this.activeProcesses = new HashMap<>();
+        this.remoteAgents = AppConfig.getRemoteAgents();
         
         registerWorkerTypes();
     }
-      private void registerWorkerTypes() {
+    
+    private void registerWorkerTypes() {
         workerConfigs.put("nota", new WorkerInfo("nota", "sdProject.network.workers.NotaWorker", AppConfig.getNotaWorkerPort()));
         workerConfigs.put("matricula", new WorkerInfo("matricula", "sdProject.network.workers.MatriculaWorker", AppConfig.getMatriculaWorkerPort()));
         workerConfigs.put("historico", new WorkerInfo("historico", "sdProject.network.workers.HistoricoWorker", AppConfig.getHistoricoWorkerPort()));
     }
-      public void start() {
+    
+    public void start() {
         scheduler.scheduleAtFixedRate(this::checkWorkersHealth, 
             AppConfig.getHealthCheckIntervalSeconds(), 
             AppConfig.getHealthCheckIntervalSeconds() * 3, 
@@ -83,7 +81,7 @@ public class WorkerMonitor {
             System.err.println("Erro ao obter serviços do tipo " + serviceType + " " + e.getMessage());
         }
 
-        return result; // Em caso de erro ou timeout, retorna vazio.
+        return result;
     }
     
     private void checkWorkersHealth() {
@@ -94,22 +92,8 @@ public class WorkerMonitor {
                 Map<String, String> availableServices = getAvailableServicesUDP(serviceType);
                 
                 if (availableServices.isEmpty()) {
-                    boolean hasActiveWorker = false;
-                    for (String key : activeProcesses.keySet()) {
-                        if (key.startsWith(serviceType + "-")) {
-                            Process process = activeProcesses.get(key);
-                            if (process.isAlive()) {
-                                hasActiveWorker = true;
-                                System.out.println("Worker " + serviceType + " está rodando, mas ainda não registrado no gateway.");
-                                break;
-                            }
-                        }
-                    }
-                    
-                    if (!hasActiveWorker) {
-                        System.out.println("Nenhum serviço do tipo " + serviceType + " encontrado. Iniciando um novo...");
-                        startNewWorker(serviceType);
-                    }
+                    System.out.println("Nenhum serviço do tipo " + serviceType + " encontrado. Solicitando novo worker aos agents remotos...");
+                    requestWorkerFromRemoteAgent(serviceType);
                 } else {
                     System.out.println("Encontrados " + availableServices.size() + " serviços do tipo " + serviceType);
                 }
@@ -119,98 +103,38 @@ public class WorkerMonitor {
         }
     }
     
-    private void startNewWorker(String serviceType) {
-        WorkerInfo info = workerConfigs.get(serviceType);
-        if (info == null) {
-            System.err.println("Configuração não encontrada para o tipo de serviço: " + serviceType);
-            return;
-        }
-        
-        try {
-            // Encontra uma porta disponível
-            int port = findAvailablePort(info.initialPort);
-            
-            // Verifica se já existe um worker deste tipo rodando
-            String processKey = serviceType + "-" + port;
-            if (activeProcesses.containsKey(processKey) && activeProcesses.get(processKey).isAlive()) {
-                System.out.println("Worker " + serviceType + " já está rodando na porta " + port);
-                return;
-            }
-            
-            // Constrói o comando para iniciar o worker
-            List<String> command = new ArrayList<>();
-            command.add("java");
-            command.add("-cp");
-            command.add(System.getProperty("java.class.path"));
-            command.add(info.className);
-            command.add(String.valueOf(port));
-            command.add(gatewayHost);
-            command.add(String.valueOf(gatewayPort));
-            
-            System.out.println("Iniciando worker " + serviceType + " na porta " + port);
-            ProcessBuilder pb = new ProcessBuilder(command);
-            pb.inheritIO(); // Redireciona saída do processo para o console
-            
-            Process process = pb.start();
-            activeProcesses.put(processKey, process);
-            
-            // Monitor para o processo
-            new Thread(() -> {
-                try {
-                    int exitCode = process.waitFor();
-                    System.out.println("Worker " + serviceType + " na porta " + port + " terminou com código " + exitCode);
-                    activeProcesses.remove(processKey);
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    System.err.println("Thread de monitoramento do worker " + serviceType + " interrompida.");
-                    activeProcesses.remove(processKey);
-                }
-            }).start();
-            
-        } catch (IOException e) {
-            System.err.println("Erro ao iniciar novo worker " + serviceType + ": " + e.getMessage());
-        }
-    }
-    
-    private int findAvailablePort(int startingPort) {
-        int port = startingPort;
-        
-        // Verifica se a porta já está sendo usada por algum processo ativo
-        synchronized (activeProcesses){
-            boolean portInUseByActiveProcess;
-            do{
-                portInUseByActiveProcess = false;
-                for (String processKey : activeProcesses.keySet()) {
-                    if (processKey.endsWith("-" + port) && activeProcesses.get(processKey).isAlive()) {
-                        // Porta já em uso, incrementa
-                        port++;
-                        portInUseByActiveProcess = true;
-                        break;
+    private void requestWorkerFromRemoteAgent(String workerType) {
+        for (String agentAddress : remoteAgents) {
+            try {
+                String[] parts = agentAddress.split(":");
+                String host = parts[0];
+                int port = Integer.parseInt(parts[1]);
+                
+                Map<String, Object> request = new HashMap<>();
+                request.put("operation", "startWorker");
+                request.put("workerType", workerType);
+                
+                try (Socket socket = new Socket(host, port);
+                     Connection connection = new Connection(socket)) {
+                    
+                    connection.send(request);
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> response = (Map<String, Object>) connection.receive();
+                    
+                    if ("success".equals(response.get("status"))) {
+                        System.out.println("Worker " + workerType + " iniciado com sucesso no agent " + agentAddress);
+                        return; // Sucesso, não precisa tentar outros agents
+                    } else {
+                        System.err.println("Agent " + agentAddress + " falhou ao iniciar worker " + workerType + ": " + response.get("message"));
                     }
                 }
-            } while (portInUseByActiveProcess);
-        }
-
-
-        // Procura por uma porta disponível e retorna a primeira que encontrar.
-        while (true){
-            if (isPortAvailable(port)){
-                return port;
-            } else {
-                port++;
+                
+            } catch (Exception e) {
+                System.err.println("Erro ao comunicar com agent " + agentAddress + ": " + e.getMessage());
             }
         }
-    }
-    
-    private boolean isPortAvailable(int port) {
-        try (ServerSocket socket = new ServerSocket(port)) {
-            socket.setReuseAddress(true);
-            // Se conseguir abrir um socket, a porta está disponível
-            return true;
-        } catch (IOException e) {
-            // Se der exceção, a porta está em uso
-            return false;
-        }
+        
+        System.err.println("Falha ao iniciar worker " + workerType + " em todos os agents remotos disponíveis");
     }
     
     public void stop() {
@@ -225,23 +149,13 @@ public class WorkerMonitor {
             Thread.currentThread().interrupt();
         }
 
-        synchronized (activeProcesses){
-            // Para todos os processos ativos
-            for (Process process : activeProcesses.values()) {
-                if (process.isAlive()){
-                    process.destroyForcibly();
-                }
-            }
-            activeProcesses.clear();
-        }
-
         System.out.println("WorkerMonitor parado");
     }
-      public static void main(String[] args) {
+    
+    public static void main(String[] args) {
         String gatewayHost = AppConfig.getGatewayHost();
         int gatewayPort = AppConfig.getGatewayPort();
         
-        // Verificar se host e porta foram passados como argumentos
         if (args.length >= 2) {
             gatewayHost = args[0];
             gatewayPort = Integer.parseInt(args[1]);
@@ -250,7 +164,6 @@ public class WorkerMonitor {
         WorkerMonitor monitor = new WorkerMonitor(gatewayHost, gatewayPort);
         monitor.start();
         
-        // Adiciona shutdown hook para parar o monitor quando o JVM for encerrado
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             System.out.println("Parando WorkerMonitor...");
             monitor.stop();

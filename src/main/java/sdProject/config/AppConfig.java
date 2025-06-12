@@ -2,6 +2,8 @@ package sdProject.config;
 
 import java.io.*;
 import java.util.Properties;
+import java.util.List;
+import java.util.Arrays;
 
 public class AppConfig {
     private static final Properties properties = new Properties();
@@ -33,6 +35,10 @@ public class AppConfig {
         properties.setProperty("MATRICULA_WORKER_PORT", "8081");
         properties.setProperty("NOTA_WORKER_PORT", "8082");
         properties.setProperty("HISTORICO_WORKER_PORT", "8083");
+        
+        // Remote Agents
+        properties.setProperty("REMOTE_AGENT_PORT", "9000");
+        properties.setProperty("REMOTE_AGENTS", "localhost:9000,localhost:9001,localhost:9002");
         
         // Timeouts e Intervalos
         properties.setProperty("UDP_TIMEOUT_MS", "5000");
@@ -86,6 +92,16 @@ public class AppConfig {
     
     public static int getHistoricoWorkerPort() {
         return Integer.parseInt(properties.getProperty("HISTORICO_WORKER_PORT"));
+    }
+    
+    // Métodos para Remote Agents
+    public static int getRemoteAgentPort() {
+        return Integer.parseInt(properties.getProperty("REMOTE_AGENT_PORT"));
+    }
+    
+    public static List<String> getRemoteAgents() {
+        String agentsStr = properties.getProperty("REMOTE_AGENTS");
+        return Arrays.asList(agentsStr.split(","));
     }
     
     // Métodos para Timeouts e Intervalos

@@ -7,9 +7,21 @@ public class WorkerInfo {
     String className;
     int initialPort;
     
-    WorkerInfo(String serviceType, String className, int initialPort) {
+    public WorkerInfo(String serviceType, String className, int initialPort) {
         this.serviceType = serviceType;
         this.className = className;
         this.initialPort = initialPort;
+    }
+    
+    public String getServiceType() {
+        return serviceType;
+    }
+    
+    public String getClassName() {
+        return className;
+    }
+    
+    public int getInitialPort() {
+        return initialPort;
     }
 }
