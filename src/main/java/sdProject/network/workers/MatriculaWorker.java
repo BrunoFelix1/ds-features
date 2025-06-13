@@ -77,6 +77,7 @@ public class MatriculaWorker extends BaseWorker {
 
     private Map<String, Object> buscarMatriculasPorAluno(Map<String, Object> request) {
         Integer alunoId = (Integer) request.get("alunoId");
+        System.out.println("ESTOU AQUIIIIIIIIIIIIIIIIIIIIIII"); 
         
         if (alunoId == null) {
             return createErrorResponse("alunoId é obrigatório");
@@ -105,7 +106,9 @@ public class MatriculaWorker extends BaseWorker {
         }
         
         return matriculaController.verificarMatricula(alunoId, disciplinaId);
-    }    public static void main(String[] args) {
+    }
+
+    public static void main(String[] args) {
         try {
             int port = AppConfig.getMatriculaWorkerPort(); // Porta padrão da configuração
             String gatewayHost = AppConfig.getGatewayHost();

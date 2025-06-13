@@ -1,6 +1,9 @@
 package sdProject.models;
 
-public class Matricula {
+import java.io.Serializable;
+
+
+public class Matricula implements Serializable {
     private int id;
     private int alunoId;
     private int disciplinaId;

@@ -122,10 +122,10 @@ public class Cliente {
         
         while (retryCount < maxRetries) {
             try {
-                ServiceLocation location = discoverService(serviceName);
+                ServiceLocation location = discoverService(serviceName); 
                   try (Connection connection = new Connection(location.getHost(), location.getPort())) {
-                    connection.send(request);
-                    return (Map<String, Object>) connection.receive();
+                    connection.send(request); 
+                    return (Map<String, Object>) connection.receive(); 
                 } catch (ConnectException e) {
                     serviceCache.remove(serviceName);
                     System.out.println("Falha na conexão com " + serviceName + ". Tentando novamente...");
@@ -150,123 +150,252 @@ public class Cliente {
 
     //MENU'S DOS SERVIÇOS
     // MENU MATRÍCULA 
-    public void menuMatricula(Integer escolhaDoSubservico, Scanner scanner) {
-        escolhaDoSubservico = -1;
+    // public void menuMatricula(Integer escolhaDoSubservico, Scanner scanner) {
+    //     escolhaDoSubservico = -1;
 
-        do{
-            System.out.println("Qual subserviço você quer acessar?");
-            System.out.println("1.Matricular aluno \n" +
-            "2.Verificar matrícula \n" +
-            "3.Listar matrículas por aluno \n" +
-            "4.Listar matrículas por disciplina \n" +
-            "5.Cancelar matrícula \n" +
-            "0.Voltar");
+    //     do{
+    //         System.out.println("Qual subserviço você quer acessar?");
+    //         System.out.println("1.Matricular aluno \n" +
+    //         "2.Verificar matrícula \n" +
+    //         "3.Listar matrículas por aluno \n" +
+    //         "4.Listar matrículas por disciplina \n" +
+    //         "5.Cancelar matrícula \n" +
+    //         "0.Voltar");
 
-            escolhaDoSubservico = scanner.nextInt();
+    //         escolhaDoSubservico = scanner.nextInt();
 
-            if (escolhaDoSubservico == 0) {
+    //         if (escolhaDoSubservico == 0) {
+    //             System.out.println("Voltando...");
+    //             break;
+    //         }
+
+    //         System.out.println("Digite o ID do aluno: ");
+    //         int alunoId = scanner.nextInt();
+    //         System.out.println("Digite o ID da disciplina: ");
+    //         int disciplinaId = scanner.nextInt();
+    
+    //         switch (escolhaDoSubservico) {
+    //             case 1:
+    //                 System.out.println("Matriculando aluno " + alunoId + " na disciplina " + disciplinaId);
+                    
+    //                 //CHAMA O CLIENTE 
+    //                 Map<String, Object> resultadoMatricula = this.matricularAluno(alunoId, disciplinaId);
+                    
+    //                 if ("success".equals(resultadoMatricula.get("status"))) {
+    //                     System.out.println("Matrícula realizada com sucesso!");
+    //                     System.out.println("Mensagem: " + resultadoMatricula.get("message"));
+    //                 } else {
+    //                     System.out.println("Erro na matrícula: " + resultadoMatricula.get("message"));
+    //                 }
+    //                 break;
+                    
+    //             case 2: 
+    //                 System.out.println("Verificando matrícula do aluno " + alunoId + " na disciplina " + disciplinaId);
+                    
+    //                 //CHAMA O CLIENTE
+    //                 Map<String, Object> resultadoVerificar = this.verificarMatricula(alunoId, disciplinaId);
+                    
+    //                 if ("success".equals(resultadoVerificar.get("status"))) {
+    //                     boolean matriculado = (Boolean) resultadoVerificar.get("matriculado");
+    //                     System.out.println("Aluno matriculado? " + matriculado);
+    //                 } else {
+    //                     System.out.println("Erro ao verificar: " + resultadoVerificar.get("message"));
+    //                 }
+    //                 break;
+                    
+    //             case 3:
+    //                 System.out.println("Listando matrículas do aluno " + alunoId);
+                    
+    //                 //CHAMA O CLIENTE
+    //                 Map<String, Object> resultadoListarAluno = this.listarMatriculasPorAluno(alunoId);
+                    
+    //                 if ("success".equals(resultadoListarAluno.get("status"))) {
+    //                     @SuppressWarnings("unchecked")
+    //                     List<Map<String, Object>> matriculas = (List<Map<String, Object>>) resultadoListarAluno.get("matriculas");
+                        
+    //                     if (matriculas.isEmpty()) {
+    //                         System.out.println("Nenhuma matrícula encontrada para o aluno ID " + alunoId);
+    //                     } else {
+    //                         for (Map<String, Object> matricula : matriculas) {
+    //                             System.out.println("Disciplina ID: " + matricula.get("disciplinaId") + " | Nota: " + matricula.get("nota"));
+    //                         }
+    //                     }
+    //                 } else {
+    //                     System.out.println("Erro ao listar: " + resultadoListarAluno.get("message"));
+    //                 }
+    //                 break;
+                    
+    //             case 4: 
+    //                 System.out.println("Listando matrículas da disciplina " + disciplinaId);
+                    
+    //                 //CHAMA O CLIENTE
+    //                 Map<String, Object> resultadoListarDisciplina = this.listarMatriculasPorDisciplina(disciplinaId);
+                    
+    //                 if ("success".equals(resultadoListarDisciplina.get("status"))) {
+    //                     @SuppressWarnings("unchecked")
+    //                     List<Map<String, Object>> matriculas = (List<Map<String, Object>>) resultadoListarDisciplina.get("matriculas");
+                        
+    //                     if (matriculas.isEmpty()) {
+    //                         System.out.println("Nenhuma matrícula encontrada para a disciplina ID " + disciplinaId);
+    //                     } else {
+    //                         System.out.println("Matrículas da disciplina ID " + disciplinaId + ":");
+    //                         for (Map<String, Object> matricula : matriculas) {
+    //                             System.out.println("Aluno ID: " + matricula.get("alunoId") + " | Nota: " + matricula.get("nota"));
+    //                         }
+    //                     }
+    //                 } else {
+    //                     System.out.println("Erro ao listar: " + resultadoListarDisciplina.get("message"));
+    //                 }
+    //                 break;
+    
+    //             case 5:
+    //                 System.out.println("Cancelando matrícula do aluno " + alunoId + " na disciplina " + disciplinaId);
+                    
+    //                 //CHAMA O CLIENTE
+    //                 Map<String, Object> resultadoCancelar = this.cancelarMatricula(alunoId, disciplinaId);
+                    
+    //                 if ("success".equals(resultadoCancelar.get("status"))) {
+    //                     System.out.println("Matrícula cancelada com sucesso!");
+    //                     System.out.println("Mensagem: " + resultadoCancelar.get("message"));
+    //                 } else {
+    //                     System.out.println("Erro ao cancelar matrícula: " + resultadoCancelar.get("message"));
+    //                 }
+    //                 break;
+                    
+    //             default:
+    //                 System.out.println("Opção inválida, tente novamente.");
+    //         }
+    //     } while (escolhaDoSubservico != 0);
+    // }
+
+    // MENU MATRÍCULA
+public void menuMatricula(Integer escolhaDoSubservico, Scanner scanner) {
+    escolhaDoSubservico = -1;
+
+    do {
+        System.out.println("Qual subserviço você quer acessar?");
+        System.out.println(
+                "1. Matricular aluno\n" +
+                "2. Verificar matrícula\n" +
+                "3. Listar matrículas por aluno\n" +
+                "4. Listar matrículas por disciplina\n" +
+                "5. Cancelar matrícula\n" +
+                "0. Voltar"
+        );
+
+        escolhaDoSubservico = scanner.nextInt();
+        scanner.nextLine(); // consome o \n após o nextInt()
+
+        switch (escolhaDoSubservico) {
+            case 0:
                 System.out.println("Voltando...");
                 break;
-            }
 
-            System.out.println("Digite o ID do aluno: ");
-            int alunoId = scanner.nextInt();
-            System.out.println("Digite o ID da disciplina: ");
-            int disciplinaId = scanner.nextInt();
-    
-            switch (escolhaDoSubservico) {
-                case 1:
-                    System.out.println("Matriculando aluno " + alunoId + " na disciplina " + disciplinaId);
-                    
-                    //CHAMA O CLIENTE 
-                    Map<String, Object> resultadoMatricula = this.matricularAluno(alunoId, disciplinaId);
-                    
-                    if ("success".equals(resultadoMatricula.get("status"))) {
-                        System.out.println("Matrícula realizada com sucesso!");
-                        System.out.println("Mensagem: " + resultadoMatricula.get("message"));
+            case 1: // Matricular aluno
+                System.out.print("Digite o ID do aluno: ");
+                int alunoIdMatricula = scanner.nextInt();
+                System.out.print("Digite o ID da disciplina: ");
+                int disciplinaIdMatricula = scanner.nextInt();
+
+                System.out.println("Matriculando aluno " + alunoIdMatricula + " na disciplina " + disciplinaIdMatricula);
+                Map<String, Object> resultadoMatricula = this.matricularAluno(alunoIdMatricula, disciplinaIdMatricula);
+
+                if ("success".equals(resultadoMatricula.get("status"))) {
+                    System.out.println("Matrícula realizada com sucesso!");
+                    System.out.println("Mensagem: " + resultadoMatricula.get("message"));
+                } else {
+                    System.out.println("Erro na matrícula: " + resultadoMatricula.get("message"));
+                }
+                break;
+
+            case 2: // Verificar matrícula
+                System.out.print("Digite o ID do aluno: ");
+                int alunoIdVerificar = scanner.nextInt();
+                System.out.print("Digite o ID da disciplina: ");
+                int disciplinaIdVerificar = scanner.nextInt();
+
+                System.out.println("Verificando matrícula do aluno " + alunoIdVerificar + " na disciplina " + disciplinaIdVerificar);
+                Map<String, Object> resultadoVerificar = this.verificarMatricula(alunoIdVerificar, disciplinaIdVerificar);
+
+                if ("success".equals(resultadoVerificar.get("status"))) {
+                    boolean matriculado = (Boolean) resultadoVerificar.get("matriculado");
+                    System.out.println("Aluno matriculado? " + matriculado);
+                } else {
+                    System.out.println("Erro ao verificar: " + resultadoVerificar.get("message"));
+                }
+                break;
+
+            case 3: // Listar matrículas por aluno
+                System.out.print("Digite o ID do aluno: ");
+                int alunoIdListar = scanner.nextInt();
+
+                System.out.println("Listando matrículas do aluno " + alunoIdListar);
+                Map<String, Object> resultadoListarAluno = this.listarMatriculasPorAluno(alunoIdListar);
+
+                if ("success".equals(resultadoListarAluno.get("status"))) {
+                    @SuppressWarnings("unchecked")
+                    List<Map<String, Object>> matriculas = (List<Map<String, Object>>) resultadoListarAluno.get("matriculas");
+
+                    if (matriculas.isEmpty()) {
+                        System.out.println("Nenhuma matrícula encontrada para o aluno ID " + alunoIdListar);
                     } else {
-                        System.out.println("Erro na matrícula: " + resultadoMatricula.get("message"));
-                    }
-                    break;
-                    
-                case 2:
-                    System.out.println("Verificando matrícula do aluno " + alunoId + " na disciplina " + disciplinaId);
-                    
-                    //CHAMA O CLIENTE
-                    Map<String, Object> resultadoVerificar = this.verificarMatricula(alunoId, disciplinaId);
-                    
-                    if ("success".equals(resultadoVerificar.get("status"))) {
-                        boolean matriculado = (Boolean) resultadoVerificar.get("matriculado");
-                        System.out.println("Aluno matriculado? " + matriculado);
-                    } else {
-                        System.out.println("Erro ao verificar: " + resultadoVerificar.get("message"));
-                    }
-                    break;
-                    
-                case 3:
-                    System.out.println("Listando matrículas do aluno " + alunoId);
-                    
-                    //CHAMA O CLIENTE
-                    Map<String, Object> resultadoListarAluno = this.listarMatriculasPorAluno(alunoId);
-                    
-                    if ("success".equals(resultadoListarAluno.get("status"))) {
-                        @SuppressWarnings("unchecked")
-                        List<Map<String, Object>> matriculas = (List<Map<String, Object>>) resultadoListarAluno.get("matriculas");
-                        
-                        if (matriculas.isEmpty()) {
-                            System.out.println("Nenhuma matrícula encontrada para o aluno ID " + alunoId);
-                        } else {
-                            for (Map<String, Object> matricula : matriculas) {
-                                System.out.println("Disciplina ID: " + matricula.get("disciplinaId") + " | Nota: " + matricula.get("nota"));
-                            }
+                        for (Map<String, Object> matricula : matriculas) {
+                            System.out.println("Disciplina ID: " + matricula.get("disciplinaId") + " | Nota: " + matricula.get("nota"));
                         }
-                    } else {
-                        System.out.println("Erro ao listar: " + resultadoListarAluno.get("message"));
                     }
-                    break;
-                    
-                case 4:
-                    System.out.println("Listando matrículas da disciplina " + disciplinaId);
-                    
-                    //CHAMA O CLIENTE
-                    Map<String, Object> resultadoListarDisciplina = this.listarMatriculasPorDisciplina(disciplinaId);
-                    
-                    if ("success".equals(resultadoListarDisciplina.get("status"))) {
-                        @SuppressWarnings("unchecked")
-                        List<Map<String, Object>> matriculas = (List<Map<String, Object>>) resultadoListarDisciplina.get("matriculas");
-                        
-                        if (matriculas.isEmpty()) {
-                            System.out.println("Nenhuma matrícula encontrada para a disciplina ID " + disciplinaId);
-                        } else {
-                            System.out.println("Matrículas da disciplina ID " + disciplinaId + ":");
-                            for (Map<String, Object> matricula : matriculas) {
-                                System.out.println("Aluno ID: " + matricula.get("alunoId") + " | Nota: " + matricula.get("nota"));
-                            }
+                } else {
+                    System.out.println("Erro ao listar: " + resultadoListarAluno.get("message"));
+                }
+                break;
+
+            case 4: // Listar matrículas por disciplina
+                System.out.print("Digite o ID da disciplina: ");
+                int disciplinaIdListar = scanner.nextInt();
+
+                System.out.println("Listando matrículas da disciplina " + disciplinaIdListar);
+                Map<String, Object> resultadoListarDisciplina = this.listarMatriculasPorDisciplina(disciplinaIdListar);
+
+                if ("success".equals(resultadoListarDisciplina.get("status"))) {
+                    @SuppressWarnings("unchecked")
+                    List<Map<String, Object>> matriculas = (List<Map<String, Object>>) resultadoListarDisciplina.get("matriculas");
+
+                    if (matriculas.isEmpty()) {
+                        System.out.println("Nenhuma matrícula encontrada para a disciplina ID " + disciplinaIdListar);
+                    } else {
+                        System.out.println("Matrículas da disciplina ID " + disciplinaIdListar + ":");
+                        for (Map<String, Object> matricula : matriculas) {
+                            System.out.println("Aluno ID: " + matricula.get("alunoId") + " | Nota: " + matricula.get("nota"));
                         }
-                    } else {
-                        System.out.println("Erro ao listar: " + resultadoListarDisciplina.get("message"));
                     }
-                    break;
-                    
-                case 5:
-                    System.out.println("Cancelando matrícula do aluno " + alunoId + " na disciplina " + disciplinaId);
-                    
-                    //CHAMA O CLIENTE
-                    Map<String, Object> resultadoCancelar = this.cancelarMatricula(alunoId, disciplinaId);
-                    
-                    if ("success".equals(resultadoCancelar.get("status"))) {
-                        System.out.println("Matrícula cancelada com sucesso!");
-                        System.out.println("Mensagem: " + resultadoCancelar.get("message"));
-                    } else {
-                        System.out.println("Erro ao cancelar matrícula: " + resultadoCancelar.get("message"));
-                    }
-                    break;
-                    
-                default:
-                    System.out.println("Opção inválida, tente novamente.");
-            }
-        } while (escolhaDoSubservico != 0);
-    }
+                } else {
+                    System.out.println("Erro ao listar: " + resultadoListarDisciplina.get("message"));
+                }
+                break;
+
+            case 5: // Cancelar matrícula
+                System.out.print("Digite o ID do aluno: ");
+                int alunoIdCancelar = scanner.nextInt();
+                System.out.print("Digite o ID da disciplina: ");
+                int disciplinaIdCancelar = scanner.nextInt();
+
+                System.out.println("Cancelando matrícula do aluno " + alunoIdCancelar + " na disciplina " + disciplinaIdCancelar);
+                Map<String, Object> resultadoCancelar = this.cancelarMatricula(alunoIdCancelar, disciplinaIdCancelar);
+
+                if ("success".equals(resultadoCancelar.get("status"))) {
+                    System.out.println("Matrícula cancelada com sucesso!");
+                    System.out.println("Mensagem: " + resultadoCancelar.get("message"));
+                } else {
+                    System.out.println("Erro ao cancelar matrícula: " + resultadoCancelar.get("message"));
+                }
+                break;
+
+            default:
+                System.out.println("Opção inválida, tente novamente.");
+        }
+
+    } while (escolhaDoSubservico != 0);
+}
+
 
     //MENU NOTA 
     public void menuNota(Integer escolhaDoSubservico, Scanner scanner) {
@@ -526,10 +655,10 @@ public class Cliente {
     public Map<String, Object> listarMatriculasPorAluno(int alunoId) {
         Map<String, Object> request = new HashMap<>();
         request.put("action", "buscarPorAluno");
-        request.put("alunoId", alunoId);
+        request.put("alunoId", alunoId); 
         
         try {
-            return callService(MATRICULA_SERVICE, request);
+            return callService(MATRICULA_SERVICE, request); 
         } catch (Exception e) {
             System.err.println("Erro ao listar matrículas por aluno: " + e.getMessage());
             e.printStackTrace();
