@@ -2,7 +2,6 @@ package sdProject.network.workers.agents;
 
 import sdProject.config.AppConfig;
 import sdProject.network.util.Connection;
-import sdProject.network.util.SerializationUtils;
 import sdProject.network.workers.monitor.WorkerInfo;
 
 import java.io.*;
@@ -41,13 +40,17 @@ public class RemoteAgent {
         workerConfigs.put("nota", new WorkerInfo("nota", "sdProject.network.workers.NotaWorker", AppConfig.getNotaWorkerPort()));
         workerConfigs.put("matricula", new WorkerInfo("matricula", "sdProject.network.workers.MatriculaWorker", AppConfig.getMatriculaWorkerPort()));
         workerConfigs.put("historico", new WorkerInfo("historico", "sdProject.network.workers.HistoricoWorker", AppConfig.getHistoricoWorkerPort()));
-    }
-
-    public void start() {
+    }    public void start() {
         try {
-            serverSocket = new ServerSocket(port);
+            // Tenta a porta configurada primeiro, se não conseguir, busca uma disponível
+            int actualPort = findAvailablePortStartingFrom(port);
+            if (actualPort != port) {
+                System.out.println("Porta " + port + " não disponível. Usando porta " + actualPort);
+            }
+            
+            serverSocket = new ServerSocket(actualPort);
             running = true;
-            System.out.println("RemoteAgent " + agentId + " iniciado na porta " + port);
+            System.out.println("RemoteAgent " + agentId + " iniciado na porta " + actualPort);
             
             new Thread(this::acceptConnections).start();
             
@@ -204,9 +207,7 @@ public class RemoteAgent {
         response.put("activeWorkers", workers);
         response.put("agentId", agentId);
         return response;
-    }
-
-    private int findAvailablePort(int startingPort) {
+    }    private int findAvailablePort(int startingPort) {
         int port = startingPort;
         
         while (true) {
@@ -215,6 +216,20 @@ public class RemoteAgent {
             }
             port++;
         }
+    }
+    
+    private int findAvailablePortStartingFrom(int startingPort) {
+        int maxRange = AppConfig.getRemoteAgentPortRange();
+        
+        for (int i = 0; i < maxRange; i++) {
+            int testPort = startingPort + i;
+            if (isPortAvailable(testPort)) {
+                return testPort;
+            }
+        }
+        
+        // Se não encontrar na faixa configurada, usa o método original que busca indefinidamente
+        return findAvailablePort(startingPort + maxRange);
     }
 
     private boolean isPortAvailable(int port) {
@@ -262,9 +277,7 @@ public class RemoteAgent {
         }
         
         System.out.println("RemoteAgent " + agentId + " parado");
-    }
-
-    public static void main(String[] args) {
+    }    public static void main(String[] args) {
         // Usar configurações padrão do AppConfig
         String agentId = "agent-" + System.currentTimeMillis(); // ID único baseado em timestamp
         int port = AppConfig.getRemoteAgentPort();
@@ -289,11 +302,21 @@ public class RemoteAgent {
         final String finalAgentId = agentId;
         
         RemoteAgent agent = new RemoteAgent(port, finalAgentId, gatewayHost, gatewayPort);
+        
+        System.out.println("Iniciando RemoteAgent " + finalAgentId + " na porta " + port + " (ou próxima disponível)...");
         agent.start();
         
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             System.out.println("Parando RemoteAgent " + finalAgentId + "...");
             agent.stop();
         }));
+        
+        // Mantém o programa rodando
+        try {
+            Thread.sleep(Long.MAX_VALUE);
+        } catch (InterruptedException e) {
+            System.out.println("RemoteAgent " + finalAgentId + " interrompido");
+            agent.stop();
+        }
     }
 }
