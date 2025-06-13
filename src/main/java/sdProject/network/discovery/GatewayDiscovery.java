@@ -113,7 +113,7 @@ public class GatewayDiscovery {
             
             switch (operation) {
                 case "register":
-                    response = registerService(request);
+                    response = registerService(request, clientAddress);
                     break;
                 case "discover":
                     response = discoverService(request);
@@ -143,24 +143,28 @@ public class GatewayDiscovery {
         }
     }
     
-    private Map<String, Object> registerService(Map<String, Object> request) {
+    private Map<String, Object> registerService(Map<String, Object> request, InetAddress clientAddress) {
         String serviceName = (String) request.get("serviceName");
-        String serviceAddress = (String) request.get("serviceAddress");
+        Integer servicePort = (Integer) request.get("servicePort");
         String serviceType = (String) request.get("serviceType");
         
         Map<String, Object> response = new HashMap<>();
         
-        if (serviceName == null || serviceAddress == null || serviceType == null) {
+        if (serviceName == null || servicePort == null || serviceType == null) {
             response.put("status", "error");
-            response.put("message", "serviceName, serviceAddress e serviceType são obrigatórios");
+            response.put("message", "serviceName, servicePort e serviceType são obrigatórios");
             return response;
         }
+
+        String clientIp = clientAddress.getHostAddress();
+        String constructedAddress = clientIp + ":" + servicePort;
         
-        serviceRegistry.put(serviceName, new ServiceInfo(serviceAddress, serviceType));
-        System.out.println("Serviço registrado: " + serviceName + " (" + serviceType + ") em " + serviceAddress);
+        serviceRegistry.put(serviceName, new ServiceInfo(constructedAddress, serviceType));
+        System.out.println("Serviço registrado: " + serviceName + " (" + serviceType + ") em " + constructedAddress);
         
         response.put("status", "success");
         response.put("message", "Serviço registrado com sucesso");
+        response.put("discoveredIp", clientIp);
         return response;
     }
     
