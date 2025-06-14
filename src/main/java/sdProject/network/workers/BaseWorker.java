@@ -42,8 +42,10 @@ public abstract class BaseWorker {
     }
 
     private String determineServiceType(String serviceId) {
-        // Extrai o tipo de serviço (nota, matricula, historico) do ID
-        // Se o formato for diferente, ajuste conforme necessário
+        // Extrai o tipo de serviço do ID (ex: "nota-8082-1749941430356" -> "nota")
+        if (serviceId.contains("-")) {
+            return serviceId.split("-")[0];
+        }
         return serviceId;
     }
     
@@ -97,12 +99,10 @@ public abstract class BaseWorker {
     private Map<String, Object> buildRegistrationRequest() {
         Map<String, Object> request = new HashMap<>();
         request.put("operation", "register");
-        request.put("serviceName", this.serviceId);
+        request.put("serviceName", this.serviceType); // Usa serviceType como nome lógico
         request.put("serviceType", this.serviceType);
-
-        // Estamos ennviando apenas a porta. O Gateway deve descobrir o IP.
         request.put("servicePort", this.port);
-
+        request.put("instanceId", this.instanceId); // Garante que instanceId vai no registro
         return request;
     }
 
@@ -124,7 +124,7 @@ public abstract class BaseWorker {
 
             Map<String, Object> request = new HashMap<>();
             request.put("operation", "register");
-            request.put("serviceName", serviceId);
+            request.put("serviceName", serviceType); // Usa serviceType como nome lógico
             request.put("serviceAddress", serviceAddress);
             request.put("serviceType", serviceType);
             request.put("instanceId", instanceId); // Inclui o ID da instância
@@ -133,6 +133,7 @@ public abstract class BaseWorker {
             Map<String, Object> response = performRegistration();
 
             // 2. Processa a resposta
+            System.out.println("Resposta do Gateway ao registrar: " + response); // Log detalhado
             if (response != null && "success".equals(response.get("status"))) {
                 System.out.println(workerName + " registrado no Gateway Discovery (UDP) como " + instanceId);
                 // Opcional: Exibe o IP que o gateway descobriu, se ele for retornado
@@ -155,10 +156,12 @@ public abstract class BaseWorker {
         try {
             Map<String, Object> request = new HashMap<>();
             request.put("operation", "heartbeat");
-            request.put("serviceName", serviceId);
+            request.put("serviceName", serviceType); // Usa serviceType como nome lógico
             request.put("instanceId", instanceId); // Inclui o ID da instância
 
             Map<String, Object> response = sendAndReceiveUDP(request);
+
+            System.out.println("[HEARTBEAT] instanceId=" + instanceId + ", resposta=" + response); // Log detalhado
 
             if (!"success".equals(response.get("status"))) {
                 System.out.println("Falha no heartbeat UDP para " + instanceId + ": " + response.get("message"));
@@ -205,6 +208,8 @@ public abstract class BaseWorker {
             // Envia a resposta
             connection.send(response);
 
+        } catch (EOFException eof) {
+            System.err.println("[INFO] Conexão fechada pelo cliente antes de enviar dados (EOFException). IP: " + clientSocket.getInetAddress().getHostAddress());
         } catch (IOException | ClassNotFoundException e) {
             System.err.println("Erro ao processar cliente: " + e.getMessage());
             e.printStackTrace();

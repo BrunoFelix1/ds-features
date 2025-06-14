@@ -22,6 +22,7 @@ public class HistoricoServiceImpl implements HistoricoService {
     private final MatriculaDAO matriculaDAO;
     private final DisciplinaDAO disciplinaDAO;
     private final AlunoDAO alunoDAO;
+    @SuppressWarnings("unused")
     private final NotaService notaService;
     
     public HistoricoServiceImpl() throws SQLException {
