@@ -127,7 +127,7 @@ public class GatewayDiscovery {
             
             switch (operation) {
                 case "register":
-                    response = registerService(request);
+                    response = registerService(request, clientAddress);
                     break;
                 case "discover":
                     response = discoverService(request);
@@ -157,19 +157,22 @@ public class GatewayDiscovery {
         }
     }
     
-    private Map<String, Object> registerService(Map<String, Object> request) {
+    private Map<String, Object> registerService(Map<String, Object> request, InetAddress clientAddress) {
         String serviceName = (String) request.get("serviceName");
-        String serviceAddress = (String) request.get("serviceAddress");
+        Integer servicePort = (Integer) request.get("servicePort");
         String serviceType = (String) request.get("serviceType");
         String instanceId = (String) request.get("instanceId"); // Novo campo para ID único da instância
         
         Map<String, Object> response = new HashMap<>();
         
-        if (serviceName == null || serviceAddress == null || serviceType == null) {
+        if (serviceName == null || servicePort == null || serviceType == null) {
             response.put("status", "error");
-            response.put("message", "serviceName, serviceAddress e serviceType são obrigatórios");
+            response.put("message", "serviceName, servicePort e serviceType são obrigatórios");
             return response;
         }
+
+        String clientIp = clientAddress.getHostAddress();
+        String constructedAddress = clientIp + ":" + servicePort;
         
         // Se não foi fornecido instanceId, usar serviceName como fallback
         if (instanceId == null) {
@@ -178,15 +181,16 @@ public class GatewayDiscovery {
         
         // Adiciona a instância à lista do tipo de serviço
         serviceRegistry.computeIfAbsent(serviceType, k -> new ArrayList<>())
-                     .add(new ServiceInfo(serviceAddress, serviceType, instanceId));
+                     .add(new ServiceInfo(constructedAddress, serviceType, instanceId));
         
         // Inicializa contador round-robin se necessário
         roundRobinCounters.putIfAbsent(serviceType, new AtomicInteger(0));
         
-        System.out.println("Instância registrada: " + instanceId + " (" + serviceType + ") em " + serviceAddress);
+        System.out.println("Instância registrada: " + instanceId + " (" + serviceType + ") em " + constructedAddress);
         
         response.put("status", "success");
         response.put("message", "Instância registrada com sucesso");
+        response.put("discoveredIp", clientIp);
         return response;
     }
     
