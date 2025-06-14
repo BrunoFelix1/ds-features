@@ -35,10 +35,15 @@ public class GatewayDiscovery {
         this.healthChecker = Executors.newScheduledThreadPool(1);
     }
       public void start() {
+        final String GREEN = "\u001B[32m";
+        @SuppressWarnings("unused")
+        final String YELLOW = "\u001B[33m";
+        final String RED = "\u001B[31m";
+        final String RESET = "\u001B[0m";
         try {
             connection = new Connection(port);
             running = true;
-            System.out.println("Gateway Discovery (UDP) iniciado na porta " + port);
+            System.out.println(GREEN + "Gateway Discovery (UDP) iniciado na porta " + port + RESET);
 
             // Inicia a thread para receber pacotes UDP
             new Thread(this::receivePackets).start();
@@ -49,13 +54,15 @@ public class GatewayDiscovery {
                 TimeUnit.SECONDS);
             
         } catch (IOException e) {
-            System.err.println("Erro ao iniciar Gateway Discovery: " + e.getMessage());
+            System.err.println(RED + "Erro ao iniciar Gateway Discovery: " + e.getMessage() + RESET);
             e.printStackTrace();
         }
     }
     
     private void checkServiceHealth() {
-        System.out.println("Verificando saúde dos serviços registrados...");
+        final String YELLOW = "\u001B[33m";
+        final String RESET = "\u001B[0m";
+        System.out.println(YELLOW + "Verificando saúde dos serviços registrados..." + RESET);
         long currentTime = System.currentTimeMillis();
         
         serviceRegistry.forEach((serviceType, instances) -> {
@@ -135,6 +142,9 @@ public class GatewayDiscovery {
                 case "heartbeat":
                     response = handleHeartbeat(request);
                     break;
+                case "getServiceStatus":
+                    response = getServiceStatus(request);
+                    break;
                 case "getServices":
                     response = getServicesOfType(request);
                     break;
@@ -186,7 +196,9 @@ public class GatewayDiscovery {
         // Inicializa contador round-robin se necessário
         roundRobinCounters.putIfAbsent(serviceType, new AtomicInteger(0));
         
-        System.out.println("Instância registrada: " + instanceId + " (" + serviceType + ") em " + constructedAddress);
+        final String GREEN = "\u001B[32m";
+        final String RESET = "\u001B[0m";
+        System.out.println(GREEN + "Instância registrada: " + instanceId + " (" + serviceType + ") em " + constructedAddress + RESET);
         
         response.put("status", "success");
         response.put("message", "Instância registrada com sucesso");
@@ -197,6 +209,8 @@ public class GatewayDiscovery {
     private Map<String, Object> handleHeartbeat(Map<String, Object> request) {
         String serviceName = (String) request.get("serviceName");
         String instanceId = (String) request.get("instanceId");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> metrics = (Map<String, Object>) request.get("metrics"); // Novo: métricas
         Map<String, Object> response = new HashMap<>();
         
         if (serviceName == null) {
@@ -216,6 +230,13 @@ public class GatewayDiscovery {
             for (ServiceInfo info : instances) {
                 if (instanceId.equals(info.instanceId)) {
                     info.lastHeartbeat = System.currentTimeMillis();
+                    if (metrics != null) {
+                        info.metrics = metrics;
+                        // Adiciona cor amarela ao texto MONITORAMENTO[]
+                        String yellow = "\u001B[33m";
+                        String reset = "\u001B[0m";
+                        System.out.println(yellow + "[MONITORAMENTO]" + reset + " Heartbeat de " + info.instanceId + " (" + info.serviceType + ") métricas: " + metrics);
+                    }
                     found = true;
                     break;
                 }
@@ -230,6 +251,31 @@ public class GatewayDiscovery {
             response.put("message", "Serviço não encontrado: " + instanceId);
         }
         
+        return response;
+    }
+
+    // Novo: retorna status/monitoramento de todas as instâncias de um tipo de serviço
+    private Map<String, Object> getServiceStatus(Map<String, Object> request) {
+        String serviceType = (String) request.get("serviceType");
+        Map<String, Object> response = new HashMap<>();
+        if (serviceType == null) {
+            response.put("status", "error");
+            response.put("message", "serviceType é obrigatório");
+            return response;
+        }
+        List<ServiceInfo> instances = serviceRegistry.get(serviceType);
+        Map<String, Object> status = new HashMap<>();
+        if (instances != null) {
+            for (ServiceInfo info : instances) {
+                Map<String, Object> inst = new HashMap<>();
+                inst.put("address", info.address);
+                inst.put("lastHeartbeat", info.lastHeartbeat);
+                inst.put("metrics", info.metrics);
+                status.put(info.instanceId, inst);
+            }
+        }
+        response.put("status", "success");
+        response.put("instances", status);
         return response;
     }
     
@@ -302,6 +348,8 @@ public class GatewayDiscovery {
         response.put("message", "Serviço não encontrado: " + serviceName);
         return response;
     }    public void stop() {
+        final String YELLOW = "\u001B[33m";
+        final String RESET = "\u001B[0m";
         running = false;
         if (connection != null) {
             try {
@@ -310,10 +358,9 @@ public class GatewayDiscovery {
                 System.err.println("Erro ao fechar conexão: " + e.getMessage());
             }
         }
-
         threadPool.shutdown();
         healthChecker.shutdown();
-        System.out.println("Gateway Discovery (UDP) parado");
+        System.out.println(YELLOW + "Gateway Discovery (UDP) parado" + RESET);
     }
       public static void main(String[] args) {
         try {

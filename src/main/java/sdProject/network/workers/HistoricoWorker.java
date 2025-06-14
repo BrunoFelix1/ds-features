@@ -96,6 +96,10 @@ public class HistoricoWorker extends BaseWorker {
        
     
     public static void main(String[] args) {
+        final String GREEN = "\u001B[32m";
+        final String YELLOW = "\u001B[33m";
+        final String RED = "\u001B[31m";
+        final String RESET = "\u001B[0m";
         try {
             int port = AppConfig.getHistoricoWorkerPort(); // Porta padrão da configuração
             String gatewayHost = AppConfig.getGatewayHost();
@@ -112,18 +116,18 @@ public class HistoricoWorker extends BaseWorker {
             }
             
             HistoricoWorker worker = new HistoricoWorker(port, gatewayHost, gatewayPort);
+            System.out.println(GREEN + "Iniciando HistoricoWorker na porta " + port + RESET);
             worker.start();
             
             // Adiciona shutdown hook para parar o worker quando o JVM for encerrado
             Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-                System.out.println("Parando HistoricoWorker...");
+                System.out.println(YELLOW + "Parando HistoricoWorker..." + RESET);
                 worker.stop();
             }));
             
-            System.out.println("Registrado no Gateway Discovery em " + gatewayHost + ":" + gatewayPort);
-            
+            System.out.println(GREEN + "Registrado no Gateway Discovery em " + gatewayHost + ":" + gatewayPort + RESET);
         } catch (Exception e) {
-            System.err.println("Erro ao iniciar HistoricoWorker: " + e.getMessage());
+            System.err.println(RED + "Erro ao iniciar HistoricoWorker: " + e.getMessage() + RESET);
             e.printStackTrace();
         }
     }

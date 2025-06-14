@@ -95,6 +95,10 @@ public class NotaWorker extends BaseWorker {
         
         return notaController.calcularMediaDisciplina(disciplinaId);
     }    public static void main(String[] args) {
+        final String GREEN = "\u001B[32m";
+        final String YELLOW = "\u001B[33m";
+        final String RED = "\u001B[31m";
+        final String RESET = "\u001B[0m";
         try {
             int port = AppConfig.getNotaWorkerPort(); // Porta padrão da configuração
             String gatewayHost = AppConfig.getGatewayHost();
@@ -111,18 +115,18 @@ public class NotaWorker extends BaseWorker {
             }
             
             NotaWorker worker = new NotaWorker(port, gatewayHost, gatewayPort);
+            System.out.println(GREEN + "Iniciando NotaWorker na porta " + port + RESET);
             worker.start();
             
             // Adiciona shutdown hook para parar o worker quando o JVM for encerrado
             Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-                System.out.println("Parando NotaWorker...");
+                System.out.println(YELLOW + "Parando NotaWorker..." + RESET);
                 worker.stop();
             }));
             
-            System.out.println("Registrado no Gateway Discovery em " + gatewayHost + ":" + gatewayPort);
-            
+            System.out.println(GREEN + "Registrado no Gateway Discovery em " + gatewayHost + ":" + gatewayPort + RESET);
         } catch (Exception e) {
-            System.err.println("Erro ao iniciar NotaWorker: " + e.getMessage());
+            System.err.println(RED + "Erro ao iniciar NotaWorker: " + e.getMessage() + RESET);
             e.printStackTrace();
         }
     }

@@ -41,21 +41,21 @@ public class RemoteAgent {
         workerConfigs.put("matricula", new WorkerInfo("matricula", "sdProject.network.workers.MatriculaWorker", AppConfig.getMatriculaWorkerPort()));
         workerConfigs.put("historico", new WorkerInfo("historico", "sdProject.network.workers.HistoricoWorker", AppConfig.getHistoricoWorkerPort()));
     }    public void start() {
+        final String GREEN = "\u001B[32m";
+        final String YELLOW = "\u001B[33m";
+        final String RED = "\u001B[31m";
+        final String RESET = "\u001B[0m";
         try {
-            // Tenta a porta configurada primeiro, se não conseguir, busca uma disponível
             int actualPort = findAvailablePortStartingFrom(port);
             if (actualPort != port) {
-                System.out.println("Porta " + port + " não disponível. Usando porta " + actualPort);
+                System.out.println(YELLOW + "Porta " + port + " ocupada, usando porta " + actualPort + RESET);
             }
-            
             serverSocket = new ServerSocket(actualPort);
             running = true;
-            System.out.println("RemoteAgent " + agentId + " iniciado na porta " + actualPort);
-            
+            System.out.println(GREEN + "RemoteAgent " + agentId + " iniciado na porta " + actualPort + RESET);
             new Thread(this::acceptConnections).start();
-            
         } catch (IOException e) {
-            System.err.println("Erro ao iniciar RemoteAgent: " + e.getMessage());
+            System.err.println(RED + "Erro ao iniciar RemoteAgent: " + e.getMessage() + RESET);
             e.printStackTrace();
         }
     }
@@ -100,6 +100,11 @@ public class RemoteAgent {
     }
 
     private Map<String, Object> startWorker(Map<String, Object> request) {
+        final String GREEN = "\u001B[32m";
+        @SuppressWarnings("unused")
+        final String YELLOW = "\u001B[33m";
+        final String RED = "\u001B[31m";
+        final String RESET = "\u001B[0m";
         String workerType = (String) request.get("workerType");
         
         if (workerType == null) {
@@ -116,7 +121,7 @@ public class RemoteAgent {
             String processKey = workerType + "-" + port;
             
             if (activeProcesses.containsKey(processKey) && activeProcesses.get(processKey).isAlive()) {
-                return createErrorResponse("Worker " + workerType + " já está rodando na porta " + port);
+                return createErrorResponse("Worker já está rodando nesta porta");
             }
             
             List<String> command = new ArrayList<>();
@@ -133,31 +138,17 @@ public class RemoteAgent {
             
             Process process = pb.start();
             activeProcesses.put(processKey, process);
-            
-            new Thread(() -> {
-                try {
-                    int exitCode = process.waitFor();
-                    System.out.println("Worker " + workerType + " na porta " + port + " terminou com código " + exitCode);
-                    activeProcesses.remove(processKey);
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    activeProcesses.remove(processKey);
-                }
-            }).start();
-            
-            System.out.println("Agent " + agentId + " iniciou worker " + workerType + " na porta " + port);
-            
-            Map<String, Object> response = createSuccessResponse("Worker " + workerType + " iniciado na porta " + port);
-            response.put("port", port);
-            response.put("agentId", agentId);
-            return response;
-            
+            System.out.println(GREEN + "Worker " + workerType + " iniciado na porta " + port + RESET);
+            return createSuccessResponse("Worker iniciado na porta " + port);
         } catch (IOException e) {
+            System.err.println(RED + "Erro ao iniciar worker: " + e.getMessage() + RESET);
             return createErrorResponse("Erro ao iniciar worker: " + e.getMessage());
         }
     }
 
     private Map<String, Object> stopWorker(Map<String, Object> request) {
+        final String YELLOW = "\u001B[33m";
+        final String RESET = "\u001B[0m";
         String workerType = (String) request.get("workerType");
         Integer port = (Integer) request.get("port");
         
@@ -168,12 +159,11 @@ public class RemoteAgent {
         String processKey = workerType + "-" + (port != null ? port : "");
         
         if (port != null) {
-            processKey = workerType + "-" + port;
             Process process = activeProcesses.get(processKey);
             if (process != null && process.isAlive()) {
-                process.destroyForcibly();
-                activeProcesses.remove(processKey);
-                return createSuccessResponse("Worker " + workerType + " parado");
+                process.destroy();
+                System.out.println(YELLOW + "Worker " + workerType + " na porta " + port + " parado." + RESET);
+                return createSuccessResponse("Worker parado na porta " + port);
             }
         } else {
             // Para todos os workers deste tipo
@@ -182,7 +172,7 @@ public class RemoteAgent {
                 if (key.startsWith(workerType + "-")) {
                     Process process = activeProcesses.get(key);
                     if (process != null && process.isAlive()) {
-                        process.destroyForcibly();
+                        process.destroy();
                         activeProcesses.remove(key);
                         found = true;
                     }
@@ -256,27 +246,25 @@ public class RemoteAgent {
     }
 
     public void stop() {
+        final String YELLOW = "\u001B[33m";
+        final String RESET = "\u001B[0m";
         running = false;
         threadPool.shutdown();
-        
         synchronized (activeProcesses) {
             for (Process process : activeProcesses.values()) {
                 if (process.isAlive()) {
-                    process.destroyForcibly();
+                    process.destroy();
                 }
             }
-            activeProcesses.clear();
         }
-        
         try {
             if (serverSocket != null && !serverSocket.isClosed()) {
                 serverSocket.close();
             }
         } catch (IOException e) {
-            System.err.println("Erro ao parar RemoteAgent: " + e.getMessage());
+            System.err.println("Erro ao fechar serverSocket: " + e.getMessage());
         }
-        
-        System.out.println("RemoteAgent " + agentId + " parado");
+        System.out.println(YELLOW + "RemoteAgent " + agentId + " parado" + RESET);
     }    public static void main(String[] args) {
         // Usar configurações padrão do AppConfig
         String agentId = "agent-" + System.currentTimeMillis(); // ID único baseado em timestamp

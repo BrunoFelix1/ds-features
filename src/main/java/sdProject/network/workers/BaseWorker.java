@@ -12,6 +12,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 
 public abstract class BaseWorker {
     protected final int port;
@@ -27,6 +28,10 @@ public abstract class BaseWorker {
     private final int gatewayPort;
 
     private static final int UDP_TIMEOUT_MS = AppConfig.getUdpTimeoutMs();
+
+    // Contador de requisições processadas desde o último heartbeat
+    protected final AtomicLong requestCount = new AtomicLong(0);
+    protected final AtomicLong lastHeartbeatCount = new AtomicLong(0);
 
     public BaseWorker(int port, String workerName, String serviceId, int threadPoolSize,
                      String gatewayHost, int gatewayPort) {
@@ -152,12 +157,23 @@ public abstract class BaseWorker {
         }
     }
 
+    // Pode ser sobrescrito por subclasses para enviar métricas reais
+    protected Map<String, Object> getMetrics() {
+        Map<String, Object> metrics = new HashMap<>();
+        long current = requestCount.get();
+        long last = lastHeartbeatCount.getAndSet(current);
+        long sinceLastHeartbeat = current - last;
+        metrics.put("requestsSinceLastHeartbeat", sinceLastHeartbeat); // Apenas essa métrica
+        return metrics;
+    }
+
     protected void sendHeartbeatUDP() {
         try {
             Map<String, Object> request = new HashMap<>();
             request.put("operation", "heartbeat");
             request.put("serviceName", serviceType); // Usa serviceType como nome lógico
             request.put("instanceId", instanceId); // Inclui o ID da instância
+            request.put("metrics", getMetrics()); // Envia métricas
 
             Map<String, Object> response = sendAndReceiveUDP(request);
 
@@ -201,6 +217,9 @@ public abstract class BaseWorker {
         try (Connection connection = new Connection(clientSocket)) {
             // Lê a requisição do cliente
             Map<String, Object> request = (Map<String, Object>) connection.receive();
+
+            // Incrementa o contador de requisições
+            requestCount.incrementAndGet();
 
             // Processa a requisição
             Map<String, Object> response = processRequest(request);

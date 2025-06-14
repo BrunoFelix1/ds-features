@@ -38,13 +38,17 @@ public class WorkerMonitor {
         workerConfigs.put("historico", new WorkerInfo("historico", "sdProject.network.workers.HistoricoWorker", AppConfig.getHistoricoWorkerPort()));
     }
     
+    @SuppressWarnings("unused")
     public void start() {
+        final String GREEN = "\u001B[32m";
+        final String YELLOW = "\u001B[33m";
+        final String RED = "\u001B[31m";
+        final String RESET = "\u001B[0m";
         scheduler.scheduleAtFixedRate(this::checkWorkersHealth, 
             AppConfig.getHealthCheckIntervalSeconds(), 
             AppConfig.getHealthCheckIntervalSeconds() * 3, 
             TimeUnit.SECONDS);
-        
-        System.out.println("WorkerMonitor iniciado. Monitorando workers...");
+        System.out.println(GREEN + "WorkerMonitor iniciado. Monitorando workers..." + RESET);
     }
 
     @SuppressWarnings("unchecked")
@@ -85,21 +89,23 @@ public class WorkerMonitor {
     }
     
     private void checkWorkersHealth() {
-        System.out.println("Verificando saúde dos workers...");
-        
+        final String GREEN = "\u001B[32m";
+        final String YELLOW = "\u001B[33m";
+        final String RED = "\u001B[31m";
+        final String RESET = "\u001B[0m";
+        System.out.println(YELLOW + "Verificando saúde dos workers..." + RESET);
         try {
             for (String serviceType : workerConfigs.keySet()) {
                 Map<String, String> availableServices = getAvailableServicesUDP(serviceType);
-                
                 if (availableServices.isEmpty()) {
-                    System.out.println("Nenhum serviço do tipo " + serviceType + " encontrado. Solicitando novo worker aos agents remotos...");
+                    System.out.println(RED + "Nenhum serviço do tipo " + serviceType + " encontrado. Solicitando novo worker aos agents remotos..." + RESET);
                     requestWorkerFromRemoteAgent(serviceType);
                 } else {
-                    System.out.println("Encontrados " + availableServices.size() + " serviços do tipo " + serviceType);
+                    System.out.println(GREEN + "Encontrados " + availableServices.size() + " serviços do tipo " + serviceType + RESET);
                 }
             }
         } catch (Exception e) {
-            System.err.println("Erro ao verificar saúde dos workers: " + e.getMessage());
+            System.err.println(RED + "Erro ao verificar saúde dos workers: " + e.getMessage() + RESET);
         }
     }
     
@@ -138,8 +144,9 @@ public class WorkerMonitor {
     }
     
     public void stop() {
+        final String YELLOW = "\u001B[33m";
+        final String RESET = "\u001B[0m";
         scheduler.shutdown();
-
         try {
             if (!scheduler.awaitTermination(5, TimeUnit.SECONDS)){
                 scheduler.shutdownNow();
@@ -148,8 +155,7 @@ public class WorkerMonitor {
             scheduler.shutdownNow();
             Thread.currentThread().interrupt();
         }
-
-        System.out.println("WorkerMonitor parado");
+        System.out.println(YELLOW + "WorkerMonitor parado" + RESET);
     }
     
     public static void main(String[] args) {

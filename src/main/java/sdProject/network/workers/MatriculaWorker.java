@@ -108,6 +108,10 @@ public class MatriculaWorker extends BaseWorker {
     }
 
     public static void main(String[] args) {
+        final String GREEN = "\u001B[32m";
+        final String YELLOW = "\u001B[33m";
+        final String RED = "\u001B[31m";
+        final String RESET = "\u001B[0m";
         try {
             int port = AppConfig.getMatriculaWorkerPort(); // Porta padrão da configuração
             String gatewayHost = AppConfig.getGatewayHost();
@@ -124,18 +128,18 @@ public class MatriculaWorker extends BaseWorker {
             }
             
             MatriculaWorker worker = new MatriculaWorker(port, gatewayHost, gatewayPort);
+            System.out.println(GREEN + "Iniciando MatriculaWorker na porta " + port + RESET);
             worker.start();
             
             // Adiciona shutdown hook para parar o worker quando o JVM for encerrado
             Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-                System.out.println("Parando MatriculaWorker...");
+                System.out.println(YELLOW + "Parando MatriculaWorker..." + RESET);
                 worker.stop();
             }));
             
-            System.out.println("Registrado no Gateway Discovery em " + gatewayHost + ":" + gatewayPort);
-            
+            System.out.println(GREEN + "Registrado no Gateway Discovery em " + gatewayHost + ":" + gatewayPort + RESET);
         } catch (Exception e) {
-            System.err.println("Erro ao iniciar MatriculaWorker: " + e.getMessage());
+            System.err.println(RED + "Erro ao iniciar MatriculaWorker: " + e.getMessage() + RESET);
             e.printStackTrace();
         }
     }
