@@ -1,7 +1,5 @@
 package sdProject.models;
-
 import java.io.Serializable;
-
 
 public class Matricula implements Serializable {
     private int id;

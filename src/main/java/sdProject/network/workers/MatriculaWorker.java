@@ -77,7 +77,6 @@ public class MatriculaWorker extends BaseWorker {
 
     private Map<String, Object> buscarMatriculasPorAluno(Map<String, Object> request) {
         Integer alunoId = (Integer) request.get("alunoId");
-        System.out.println("ESTOU AQUIIIIIIIIIIIIIIIIIIIIIII"); 
         
         if (alunoId == null) {
             return createErrorResponse("alunoId é obrigatório");

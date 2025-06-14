@@ -71,7 +71,7 @@ public class MatriculaController {
         try {
             List<Matricula> matriculas = matriculaService.buscarMatriculasPorDisciplina(disciplinaId);
             response.put("status", "success");
-            response.put("data", matriculas);
+            response.put("matriculas", matriculas);
         } catch (SQLException e) {
             response.put("status", "error");
             response.put("message", "Erro ao acessar o banco de dados: " + e.getMessage());

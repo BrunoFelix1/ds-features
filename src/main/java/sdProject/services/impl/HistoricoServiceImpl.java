@@ -93,8 +93,4 @@ public class HistoricoServiceImpl implements HistoricoService {
         return disciplinasEmCurso;
     }
     
-    @Override
-    public Double calcularCoeficienteRendimento(int alunoId) throws SQLException {
-        return notaService.calcularMediaAluno(alunoId);
-    }
 }

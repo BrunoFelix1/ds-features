@@ -40,8 +40,6 @@ public class HistoricoWorker extends BaseWorker {
                     return listarDisciplinasReprovadas(request);
                 case "disciplinasEmCurso":
                     return listarDisciplinasEmCurso(request);
-                case "coeficienteRendimento":
-                    return calcularCoeficienteRendimento(request);
                 default:
                     return createErrorResponse("Ação desconhecida: " + action);
             }
@@ -93,19 +91,11 @@ public class HistoricoWorker extends BaseWorker {
             return createErrorResponse("alunoId é obrigatório");
         }
         
-        return historicoController.listarDisciplinasEmCurso(alunoId);
+        return historicoController.listarDisciplinasEmCurso(alunoId); 
     }
+       
     
-
-    private Map<String, Object> calcularCoeficienteRendimento(Map<String, Object> request) {
-        Integer alunoId = (Integer) request.get("alunoId");
-        
-        if (alunoId == null) {
-            return createErrorResponse("alunoId é obrigatório");
-        }
-        
-        return historicoController.calcularCoeficienteRendimento(alunoId);
-    }    public static void main(String[] args) {
+    public static void main(String[] args) {
         try {
             int port = AppConfig.getHistoricoWorkerPort(); // Porta padrão da configuração
             String gatewayHost = AppConfig.getGatewayHost();

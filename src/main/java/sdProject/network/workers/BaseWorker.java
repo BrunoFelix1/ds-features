@@ -18,6 +18,7 @@ public abstract class BaseWorker {
     protected final String workerName;
     protected final String serviceId;
     protected final String serviceType; 
+    protected final String instanceId; // Novo campo para ID único da instância
     protected volatile boolean running = false;
     protected ServerSocket serverSocket;
     protected final ExecutorService threadPool;
@@ -33,6 +34,7 @@ public abstract class BaseWorker {
         this.workerName = workerName;
         this.serviceId = serviceId;
         this.serviceType = determineServiceType(serviceId);
+        this.instanceId = generateInstanceId(); // Gera ID único para esta instância
         this.threadPool = Executors.newFixedThreadPool(threadPoolSize);
         this.heartbeatScheduler = Executors.newScheduledThreadPool(1);
         this.gatewayHost = gatewayHost;
@@ -43,6 +45,11 @@ public abstract class BaseWorker {
         // Extrai o tipo de serviço (nota, matricula, historico) do ID
         // Se o formato for diferente, ajuste conforme necessário
         return serviceId;
+    }
+    
+    private String generateInstanceId() {
+        // Gera um ID único combinando serviceId, porta e timestamp
+        return serviceId + "-" + port + "-" + System.currentTimeMillis();
     }
     
     public BaseWorker(int port, String workerName, String serviceId, int threadPoolSize) {
@@ -97,18 +104,19 @@ public abstract class BaseWorker {
             request.put("serviceName", serviceId);
             request.put("serviceAddress", serviceAddress);
             request.put("serviceType", serviceType);
+            request.put("instanceId", instanceId); // Inclui o ID da instância
 
             Map<String, Object> response = sendAndReceiveUDP(request);
 
             if ("success".equals(response.get("status"))) {
-                System.out.println(workerName + " registrado no Gateway Discovery (UDP) como " + serviceId);
+                System.out.println(workerName + " registrado no Gateway Discovery (UDP) como " + instanceId);
             } else {
                 System.out.println("Falha ao registrar no Gateway (UDP): " + response.get("message"));
             }
         } catch (SocketTimeoutException e) {
             System.err.println("Timeout ao registrar no Gateway Discovery (UDP): " + e.getMessage());
         } catch (Exception e) {
-            System.err.println("Erro ao registrar no Gateway Discoveryu (UDP): " + e.getMessage());
+            System.err.println("Erro ao registrar no Gateway Discovery (UDP): " + e.getMessage());
         }
     }
     
@@ -117,16 +125,17 @@ public abstract class BaseWorker {
             Map<String, Object> request = new HashMap<>();
             request.put("operation", "heartbeat");
             request.put("serviceName", serviceId);
+            request.put("instanceId", instanceId); // Inclui o ID da instância
 
             Map<String, Object> response = sendAndReceiveUDP(request);
 
             if (!"success".equals(response.get("status"))) {
-                System.out.println("Falha no heartbeat UDP para " + serviceId + ": " + response.get("message"));
+                System.out.println("Falha no heartbeat UDP para " + instanceId + ": " + response.get("message"));
                 if ("Serviço não encontrado".equals(response.get("message"))) {
                     registerWithDiscoveryGatewayUDP();
                 }
             } else {
-                System.out.println("Heartbeat UDP para " + serviceId + " enviado com sucesso.");
+                System.out.println("Heartbeat UDP para " + instanceId + " enviado com sucesso.");
             }
         } catch (SocketTimeoutException e) {
             System.err.println("Timeout no heartbeat para Gateway Discovery (UDP): " + e.getMessage());
@@ -205,4 +214,4 @@ public abstract class BaseWorker {
     }
     
     
-}
+} 

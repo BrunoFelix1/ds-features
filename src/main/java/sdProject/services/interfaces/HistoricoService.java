@@ -12,5 +12,4 @@ public interface HistoricoService {
     Map<Disciplina, Double> listarDisciplinasAprovadas(int alunoId) throws SQLException;
     Map<Disciplina, Double> listarDisciplinasReprovadas(int alunoId) throws SQLException;
     List<Disciplina> listarDisciplinasEmCurso(int alunoId) throws SQLException;
-    Double calcularCoeficienteRendimento(int alunoId) throws SQLException;
 }
