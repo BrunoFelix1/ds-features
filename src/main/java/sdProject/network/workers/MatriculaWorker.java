@@ -105,7 +105,9 @@ public class MatriculaWorker extends BaseWorker {
         }
         
         return matriculaController.verificarMatricula(alunoId, disciplinaId);
-    }    public static void main(String[] args) {
+    }
+
+    public static void main(String[] args) {
         try {
             int port = AppConfig.getMatriculaWorkerPort(); // Porta padrão da configuração
             String gatewayHost = AppConfig.getGatewayHost();

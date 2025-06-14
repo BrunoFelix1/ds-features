@@ -1,6 +1,7 @@
 package sdProject.models;
+import java.io.Serializable;
 
-public class CursoDisciplina {
+public class CursoDisciplina implements Serializable {
     private int cursoId;
     private int disciplinaId;
 

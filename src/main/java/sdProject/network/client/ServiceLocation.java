@@ -3,7 +3,7 @@ package sdProject.network.client;
 //classe simples, pra saber onde tá um worker
 public class ServiceLocation {
     private final String host;
-    private final int port;
+    private final int port; 
     
     public ServiceLocation(String address) {
         String[] parts = address.split(":");

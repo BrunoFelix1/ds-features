@@ -74,7 +74,7 @@ public class MatriculaServiceImpl implements MatriculaService {
     
     @Override
     public List<Matricula> buscarMatriculasPorDisciplina(int disciplinaId) throws SQLException {
-        return matriculaDAO.findByDisciplinaId(disciplinaId);
+        return matriculaDAO.findByDisciplinaId(disciplinaId); 
     }
     
     @Override

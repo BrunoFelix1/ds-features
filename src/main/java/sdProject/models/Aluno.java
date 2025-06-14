@@ -1,6 +1,7 @@
 package sdProject.models;
+import java.io.Serializable;
 
-public class Aluno {
+public class Aluno implements Serializable {
     private int id;
     private String nome;
     private String cpf;
