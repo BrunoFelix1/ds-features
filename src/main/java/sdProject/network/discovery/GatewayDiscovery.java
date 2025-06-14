@@ -13,11 +13,18 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.List;
+import java.util.ArrayList;
 
 public class GatewayDiscovery {
     private final int port;
     
-    private final Map<String, ServiceInfo> serviceRegistry = new ConcurrentHashMap<>();
+    // Mudança: agora cada serviço pode ter múltiplas instâncias
+    private final Map<String, List<ServiceInfo>> serviceRegistry = new ConcurrentHashMap<>();
+    // Para load balancing round-robin
+    private final Map<String, AtomicInteger> roundRobinCounters = new ConcurrentHashMap<>();
+    
     private volatile boolean running = false;
     private Connection connection;
     private final ExecutorService threadPool;
@@ -51,21 +58,28 @@ public class GatewayDiscovery {
         System.out.println("Verificando saúde dos serviços registrados...");
         long currentTime = System.currentTimeMillis();
         
-        serviceRegistry.forEach((serviceName, info) -> {
-            // Considera um serviço inativo se não tiver enviado heartbeat nos últimos 30 segundos
-            if (currentTime - info.lastHeartbeat > 15000) {
-                System.out.println("Serviço inativo detectado: " + serviceName + " em " + info.address);
-                
-                // Tenta conectar para confirmar se realmente está inativo
-                if (!isServiceAlive(info.address)) {
-                    System.out.println("Confirmado: Serviço " + serviceName + " está inativo. Removendo do registro.");
-                    serviceRegistry.remove(serviceName);
-                } else {
-                    if (currentTime - info.lastHeartbeat > 60000){
-                        System.out.println("Removendo " + serviceName + " devido a heartbeats UDP ausentes prolongados, apesar de TCP check OK.");
-                        serviceRegistry.remove(serviceName);
+        serviceRegistry.forEach((serviceType, instances) -> {
+            instances.removeIf(info -> {
+                if (currentTime - info.lastHeartbeat > 15000) {
+                    System.out.println("Serviço inativo detectado: " + info.instanceId + " em " + info.address);
+                    
+                    if (!isServiceAlive(info.address)) {
+                        System.out.println("Confirmado: Instância " + info.instanceId + " está inativa. Removendo do registro.");
+                        return true;
+                    } else {
+                        if (currentTime - info.lastHeartbeat > 60000) {
+                            System.out.println("Removendo " + info.instanceId + " devido a heartbeats UDP ausentes prolongados.");
+                            return true;
+                        }
                     }
                 }
+                return false;
+            });
+            
+            // Remove listas vazias
+            if (instances.isEmpty()) {
+                serviceRegistry.remove(serviceType);
+                roundRobinCounters.remove(serviceType);
             }
         });
     }
@@ -147,6 +161,7 @@ public class GatewayDiscovery {
         String serviceName = (String) request.get("serviceName");
         String serviceAddress = (String) request.get("serviceAddress");
         String serviceType = (String) request.get("serviceType");
+        String instanceId = (String) request.get("instanceId"); // Novo campo para ID único da instância
         
         Map<String, Object> response = new HashMap<>();
         
@@ -156,16 +171,28 @@ public class GatewayDiscovery {
             return response;
         }
         
-        serviceRegistry.put(serviceName, new ServiceInfo(serviceAddress, serviceType));
-        System.out.println("Serviço registrado: " + serviceName + " (" + serviceType + ") em " + serviceAddress);
+        // Se não foi fornecido instanceId, usar serviceName como fallback
+        if (instanceId == null) {
+            instanceId = serviceName;
+        }
+        
+        // Adiciona a instância à lista do tipo de serviço
+        serviceRegistry.computeIfAbsent(serviceType, k -> new ArrayList<>())
+                     .add(new ServiceInfo(serviceAddress, serviceType, instanceId));
+        
+        // Inicializa contador round-robin se necessário
+        roundRobinCounters.putIfAbsent(serviceType, new AtomicInteger(0));
+        
+        System.out.println("Instância registrada: " + instanceId + " (" + serviceType + ") em " + serviceAddress);
         
         response.put("status", "success");
-        response.put("message", "Serviço registrado com sucesso");
+        response.put("message", "Instância registrada com sucesso");
         return response;
     }
     
     private Map<String, Object> handleHeartbeat(Map<String, Object> request) {
         String serviceName = (String) request.get("serviceName");
+        String instanceId = (String) request.get("instanceId");
         Map<String, Object> response = new HashMap<>();
         
         if (serviceName == null) {
@@ -174,13 +201,29 @@ public class GatewayDiscovery {
             return response;
         }
         
-        ServiceInfo info = serviceRegistry.get(serviceName);
-        if (info != null) {
-            info.lastHeartbeat = System.currentTimeMillis();
+        // Se não foi fornecido instanceId, usar serviceName
+        if (instanceId == null) {
+            instanceId = serviceName;
+        }
+        
+        boolean found = false;
+        // Procura em todos os tipos de serviço pela instância específica
+        for (List<ServiceInfo> instances : serviceRegistry.values()) {
+            for (ServiceInfo info : instances) {
+                if (instanceId.equals(info.instanceId)) {
+                    info.lastHeartbeat = System.currentTimeMillis();
+                    found = true;
+                    break;
+                }
+            }
+            if (found) break;
+        }
+        
+        if (found) {
             response.put("status", "success");
         } else {
             response.put("status", "error");
-            response.put("message", "Serviço não encontrado: " + serviceName);
+            response.put("message", "Serviço não encontrado: " + instanceId);
         }
         
         return response;
@@ -197,11 +240,13 @@ public class GatewayDiscovery {
         }
         
         Map<String, String> services = new HashMap<>();
-        serviceRegistry.forEach((name, info) -> {
-            if (serviceType.equals(info.serviceType)) {
-                services.put(name, info.address);
+        List<ServiceInfo> instances = serviceRegistry.get(serviceType);
+        
+        if (instances != null) {
+            for (ServiceInfo info : instances) {
+                services.put(info.instanceId, info.address);
             }
-        });
+        }
         
         response.put("status", "success");
         response.put("services", services);
@@ -219,27 +264,38 @@ public class GatewayDiscovery {
             return response;
         }
         
-        ServiceInfo info = serviceRegistry.get(serviceName);
-        
-        if (info == null) {
-            // Se o serviço exato não foi encontrado, procuramos outros do mesmo tipo
-            String serviceType = serviceName; // Assume que o nome é o tipo
-            
-            for (Map.Entry<String, ServiceInfo> entry : serviceRegistry.entrySet()) {
-                if (serviceType.equals(entry.getValue().serviceType)) {
+        // Primeiro tenta encontrar por instanceId específico
+        for (List<ServiceInfo> instances : serviceRegistry.values()) {
+            for (ServiceInfo info : instances) {
+                if (serviceName.equals(info.instanceId)) {
                     response.put("status", "success");
-                    response.put("serviceAddress", entry.getValue().address);
+                    response.put("serviceAddress", info.address);
                     return response;
                 }
             }
+        }
+        
+        // Se não encontrou instância específica, procura por tipo de serviço com load balancing
+        List<ServiceInfo> instances = serviceRegistry.get(serviceName);
+        if (instances != null && !instances.isEmpty()) {
+            // Load balancing round-robin
+            AtomicInteger counter = roundRobinCounters.get(serviceName);
+            if (counter == null) {
+                counter = new AtomicInteger(0);
+                roundRobinCounters.put(serviceName, counter);
+            }
             
-            response.put("status", "error");
-            response.put("message", "Serviço não encontrado: " + serviceName);
+            int index = counter.getAndIncrement() % instances.size();
+            ServiceInfo selectedInstance = instances.get(index);
+            
+            response.put("status", "success");
+            response.put("serviceAddress", selectedInstance.address);
+            response.put("selectedInstance", selectedInstance.instanceId);
             return response;
         }
         
-        response.put("status", "success");
-        response.put("serviceAddress", info.address);
+        response.put("status", "error");
+        response.put("message", "Serviço não encontrado: " + serviceName);
         return response;
     }    public void stop() {
         running = false;
