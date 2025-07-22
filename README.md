@@ -274,9 +274,9 @@ mvn verify
 ## Educational Value
 
 This project demonstrates:
-- **Distributed Systems Architecture**: Real-world microservices implementation
+- **Distributed Systems Architecture**: Real-world  implementation
 - **Fault Tolerance Patterns**: Practical resilience engineering
 - **Network Programming**: Low-level socket programming and protocols
 - **Service Design**: RESTful service principles and API design
 - **Database Integration**: ORM patterns and migration strategies
-- **Testing Strategies**: Unit, integration, and load testing approaches
+- **Testing Strategies**: Load testing approaches
